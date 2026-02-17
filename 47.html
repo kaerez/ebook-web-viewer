@@ -38,7 +38,6 @@
         "responsiveHeight":true,
         "containerRatio":"16:9",
         "btnThumbs": {"enabled": false},
-        "btnSearch": {"enabled": true},
         "thumbnailsOnStart":false,
         "contentOnStart":false,
         "tableOfContentCloseOnClick":true,
@@ -48,14 +47,13 @@
         "autoplayLoop":true,
         "autoplayStartPage":"1",
         "rightToLeft":true,
-        "btnPrint": {"enabled": false}, 
+        "btnPrint": {"enabled": true}, 
         "btnDownloadPages": {"enabled": false},
-        "btnDownloadPdf": {"forceDownload": false,"enabled": false},
+        "btnDownloadPdf": {"forceDownload": false,"enabled": true},
         "btnBookmark": {"enabled": false},
         "btnNotes": {"enabled": false}, 
-        "btnShare": {"enabled": false},
-        "btnAutoplay": {"enabled": false},
-        "btnPrint": {"enabled": false}
+        "btnShare": {"enabled": true},
+        "btnAutoplay": {"enabled": false}
         };
       const container = document.getElementById('container');
       new FlipBook(container, flipbookOptions_global);

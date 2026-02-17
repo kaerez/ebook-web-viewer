@@ -1,3 +1,10 @@
+<!-- 
+============================================
+   Real3D FlipBook Generator
+   Author: Erez Kalman - KSEC
+   License: Commercial
+============================================
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,6 +24,10 @@
                             50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8',
                             500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a', 950: '#020617',
                         }
+                    },
+                    zIndex: {
+                        '100': '100',
+                        '9999': '9999'
                     }
                 }
             }
@@ -29,6 +40,16 @@
     
     <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Utilities for PDF Converter -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <script>
+        // Initialize PDF.js Worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
 
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -43,18 +64,16 @@
     <div id="root" class="h-full"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useRef, useCallback } = React;
 
-        // --- ICONS SYSTEM (Zero Dependency) ---
+        // --- ICONS SYSTEM ---
         const ICONS = {
-            Copy: <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2 M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1Z" />,
             FileText: <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8" />,
             Settings: <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />,
             Code: <path d="m16 18 6-6-6-6 M8 6l-6 6 6 6" />,
             Layers: <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z M22 17.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65 M22 12.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />,
             Layout: <path d="M3 3h18v18H3z M3 9h18 M9 21V9" />,
             Eye: <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />,
-            CheckSquare: <path d="m9 11 3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />,
             Smartphone: <path d="M12 2h-4a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z M12 18h.01" />,
             Monitor: <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z M12 2v2 M8 22h8" />,
             Share2: <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8 M16 6l-4-4-4 4 M12 2v13" />,
@@ -79,11 +98,16 @@
             Link: <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71 M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />,
             ExternalLink: <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6 M15 3h6v6 M10 14L21 3" />,
             RefreshCw: <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8 M21 3v5h-5 M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16 M3 21v-5h5" />,
-            Move: <path d="M5 9l-3 3 3 3 M9 5l3-3 3 3 M19 9l3 3-3 3 M9 19l3 3 3-3 M2 12h20 M12 2v20" />
+            Move: <path d="M5 9l-3 3 3 3 M9 5l3-3 3 3 M19 9l3 3-3 3 M9 19l3 3 3-3 M2 12h20 M12 2v20" />,
+            CheckSquare: <path d="m9 11 3 3L22 4 M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />,
+            ArrowUp: <path d="M12 19V5 M5 12l7-7 7 7" />,
+            ArrowDown: <path d="M12 5v14 M5 12l7 7 7-7" />,
+            Undo: <path d="M9 14 4 9l5-5" />,
+            Images: <path d="M18 22H6c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h12c1.1 0 2 .9 2 2v16c0 1.1-.9 2-2 2zM6 4v11l4-4 3 3 5-5v-1H6zm0 16h12v-2l-5 5-3-3-4 4v-4z" />
         };
 
         const Icon = ({ name, size = 16, className = "" }) => {
-            if (!ICONS[name] && name !== 'InfoCustom') return null;
+            if (!ICONS[name]) return null;
             return (
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -102,103 +126,717 @@
             );
         };
 
-        // Custom 'i' icon with specific paths requested
+        // --- GLOBAL TOOLTIP STATE ---
+        const tooltipEvents = {
+            show: (text, x, y) => {},
+            hide: () => {}
+        };
+
+        const GlobalTooltip = () => {
+            const [visible, setVisible] = useState(false);
+            const [content, setContent] = useState('');
+            const [pos, setPos] = useState({ x: 0, y: 0 });
+
+            useEffect(() => {
+                tooltipEvents.show = (text, x, y) => {
+                    setContent(text);
+                    let xPos = x + 20; 
+                    if (xPos + 260 > window.innerWidth) {
+                        xPos = x - 280; 
+                    }
+                    const yPos = Math.min(y, window.innerHeight - 100);
+                    setPos({ x: xPos, y: yPos });
+                    setVisible(true);
+                };
+                tooltipEvents.hide = () => setVisible(false);
+            }, []);
+
+            if (!visible) return null;
+
+            return (
+                <div 
+                    className="fixed z-[9999] w-64 p-3 text-xs leading-relaxed text-white bg-slate-800 rounded-lg shadow-2xl pointer-events-none transition-opacity duration-200 border border-slate-700 font-sans"
+                    style={{ top: pos.y, left: pos.x }}
+                >
+                    {content}
+                </div>
+            );
+        };
+
         const InfoIcon = () => (
-            <svg viewBox="0 0 16 16" className="w-3 h-3 text-slate-400 cursor-help hover:text-blue-500 transition-colors inline align-middle" aria-hidden="true" focusable="false">
+            <svg viewBox="0 0 16 16" className="w-3 h-3 text-slate-400 cursor-help hover:text-blue-500 transition-colors inline align-middle ml-1" aria-hidden="true" focusable="false">
                 <path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zm0 12a5.5 5.5 0 110-11 5.5 5.5 0 010 11z" fill="currentColor" />
                 <path d="M8.572 6.253H6.607v1h.965v3.812H6.397v1h3.35v-1H8.572V6.253zM8.49 4.032H7.235v1.255H8.49V4.032z" fill="currentColor" />
             </svg>
         );
 
-        // --- LAYOUT PRESETS (Exact definitions from ui.md) ---
+        // --- INPUT COMPONENTS ---
+        const InputWrapper = ({ label, helpKey, isMobile, hasOverride, onResetOverride, children }) => (
+            <div className={`mb-3 ${isMobile ? 'p-2 bg-purple-50/50 rounded border border-purple-100' : ''}`}>
+                <div className="flex justify-between items-start mb-1">
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center">
+                        {label}
+                        {helpKey && (
+                            <div className="cursor-help" onMouseEnter={(e) => tooltipEvents.show(tooltips[helpKey] || tooltips[label] || "No description available", e.clientX, e.clientY)} onMouseLeave={() => tooltipEvents.hide()}>
+                                 <InfoIcon />
+                            </div>
+                        )}
+                    </label>
+                    {hasOverride && isMobile && (
+                        <button onClick={onResetOverride} className="text-[10px] text-red-500 hover:underline px-1">
+                            Reset Override
+                        </button>
+                    )}
+                </div>
+                {children}
+            </div>
+        );
+
+        const TextInput = ({ label, value, onChange, placeholder, helpKey, isMobile, hasOverride, onResetOverride }) => (
+            <InputWrapper label={label} helpKey={helpKey} isMobile={isMobile} hasOverride={hasOverride} onResetOverride={onResetOverride}>
+                <input
+                    type="text"
+                    className="block w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm p-2 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    value={value || ''}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder={placeholder}
+                />
+            </InputWrapper>
+        );
+
+        const NumberInput = ({ label, value, onChange, placeholder, helpKey, isMobile, hasOverride, onResetOverride, step = 1, min, max }) => (
+            <InputWrapper label={label} helpKey={helpKey} isMobile={isMobile} hasOverride={hasOverride} onResetOverride={onResetOverride}>
+                <input
+                    type="number"
+                    step={step}
+                    min={min}
+                    max={max}
+                    className="block w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm p-2 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    value={value !== undefined ? value : ''}
+                    onChange={(e) => onChange(Number(e.target.value))}
+                    placeholder={placeholder}
+                />
+            </InputWrapper>
+        );
+
+        const Toggle = ({ label, checked, onChange, helpKey, isMobile, hasOverride, onResetOverride }) => (
+            <InputWrapper label={label} helpKey={helpKey} isMobile={isMobile} hasOverride={hasOverride} onResetOverride={onResetOverride}>
+                <button
+                    onClick={() => onChange(!checked)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${checked ? 'bg-blue-600' : 'bg-slate-200'}`}
+                >
+                    <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${checked ? 'translate-x-4.5' : 'translate-x-1'}`}
+                        style={{ transform: checked ? 'translateX(18px)' : 'translateX(4px)' }}
+                    />
+                </button>
+            </InputWrapper>
+        );
+
+        const SelectInput = ({ label, value, onChange, options = [], helpKey, isMobile, hasOverride, onResetOverride }) => (
+            <InputWrapper label={label} helpKey={helpKey} isMobile={isMobile} hasOverride={hasOverride} onResetOverride={onResetOverride}>
+                <select
+                    className="block w-full rounded-md border border-slate-300 bg-white text-slate-900 text-sm p-2 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    value={value || ''}
+                    onChange={(e) => onChange(e.target.value)}
+                >
+                    {options.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                        </option>
+                    ))}
+                </select>
+            </InputWrapper>
+        );
+
+        const JsonInput = ({ label, value, onChange, helpKey, isMobile, hasOverride, onResetOverride }) => {
+            const [text, setText] = useState(JSON.stringify(value, null, 2));
+            const [error, setError] = useState(false);
+
+            useEffect(() => {
+                setText(JSON.stringify(value, null, 2));
+            }, [value]);
+
+            const handleChange = (newText) => {
+                setText(newText);
+                try {
+                    const parsed = JSON.parse(newText);
+                    onChange(parsed);
+                    setError(false);
+                } catch (e) {
+                    setError(true);
+                }
+            };
+
+            return (
+                <InputWrapper label={label} helpKey={helpKey} isMobile={isMobile} hasOverride={hasOverride} onResetOverride={onResetOverride}>
+                    <textarea
+                        className={`block w-full rounded-md border text-slate-900 text-xs font-mono p-2 shadow-sm h-32 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 ${error ? 'border-red-500 bg-red-50' : 'border-slate-300 bg-white'}`}
+                        value={text}
+                        onChange={(e) => handleChange(e.target.value)}
+                    />
+                    {error && <p className="text-[10px] text-red-500 mt-1">Invalid JSON</p>}
+                </InputWrapper>
+            );
+        };
+
+        const Section = ({ title, children, icon: IconName }) => (
+            <div className="mb-8 border-b border-slate-100 pb-6 last:border-0 last:pb-0">
+                <h3 className="text-sm font-bold uppercase text-blue-600 mb-4 flex items-center gap-2">
+                    {IconName && <Icon name={IconName} size={16} />}
+                    {title}
+                </h3>
+                {children}
+            </div>
+        );
+
+        // --- PDF CONVERTER COMPONENT ---
+        const PdfConverterModal = ({ isOpen, onClose, onAddPages }) => {
+            const [file, setFile] = useState(null);
+            const [progress, setProgress] = useState(0);
+            const [total, setTotal] = useState(0);
+            const [processing, setProcessing] = useState(false);
+            const [generatedPages, setGeneratedPages] = useState([]);
+            const [zipFile, setZipFile] = useState(null);
+            
+            // New state for import flow
+            const [importMode, setImportMode] = useState('review'); // 'review' | 'options'
+            const [addType, setAddType] = useState('embed'); // 'embed' | 'reference'
+            const [basePath, setBasePath] = useState('pages/');
+
+            const [settings, setSettings] = useState({
+                pageHeight: 1500,
+                thumbHeight: 200,
+                quality: 0.8,
+                format: 'image/webp', 
+                formatExt: 'webp'
+            });
+
+            const handleFileChange = (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    resetState();
+                    setFile(e.target.files[0]);
+                }
+            };
+
+            const resetState = () => {
+                setGeneratedPages([]);
+                setZipFile(null);
+                setProgress(0);
+                setTotal(0);
+                setImportMode('review');
+            };
+
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            };
+
+            const handleDrop = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    if (e.dataTransfer.files[0].type === "application/pdf") {
+                        resetState();
+                        setFile(e.dataTransfer.files[0]);
+                    } else {
+                        alert("Please drop a PDF file.");
+                    }
+                }
+            };
+
+            const convertPdf = async () => {
+                if (!file) return;
+                setProcessing(true);
+                setGeneratedPages([]);
+                setProgress(0);
+
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    setTotal(pdf.numPages);
+
+                    const zip = new JSZip();
+                    const newPages = [];
+
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        
+                        // 1. Render High Res Page
+                        const viewport = page.getViewport({ scale: 1 });
+                        const scale = settings.pageHeight / viewport.height;
+                        const scaledViewport = page.getViewport({ scale });
+
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = scaledViewport.height;
+                        canvas.width = scaledViewport.width;
+
+                        await page.render({
+                            canvasContext: context,
+                            viewport: scaledViewport
+                        }).promise;
+
+                        const imgBlob = await new Promise(resolve => canvas.toBlob(resolve, settings.format, settings.quality));
+                        const imgFileName = `${i}.${settings.formatExt}`;
+                        zip.file(imgFileName, imgBlob);
+
+                        // 2. Render Thumbnail
+                        const thumbScale = settings.thumbHeight / viewport.height;
+                        const thumbViewport = page.getViewport({ scale: thumbScale });
+                        const thumbCanvas = document.createElement('canvas');
+                        const thumbContext = thumbCanvas.getContext('2d');
+                        thumbCanvas.height = thumbViewport.height;
+                        thumbCanvas.width = thumbViewport.width;
+
+                        await page.render({
+                            canvasContext: thumbContext,
+                            viewport: thumbViewport
+                        }).promise;
+
+                        const thumbBlob = await new Promise(resolve => thumbCanvas.toBlob(resolve, settings.format, 0.7)); 
+                        const thumbFileName = `${i}_thumb.${settings.formatExt}`;
+                        zip.file(thumbFileName, thumbBlob);
+
+                        // 3. Extract JSON Data
+                        const textContent = await page.getTextContent();
+                        const pageJson = {
+                            width: scaledViewport.width,
+                            height: scaledViewport.height,
+                            text: textContent.items.map(item => ({
+                                str: item.str,
+                                dir: item.dir,
+                                width: item.width,
+                                height: item.height,
+                                transform: item.transform,
+                                fontName: item.fontName
+                            }))
+                        };
+                        const jsonFileName = `${i}.json`;
+                        zip.file(jsonFileName, JSON.stringify(pageJson));
+
+                        // Store for preview/add
+                        // We store the blobs directly to use later in 'Embed' mode or preview
+                        newPages.push({
+                            srcBlob: imgBlob,
+                            thumbBlob: thumbBlob,
+                            jsonObj: pageJson,
+                            
+                            // For Preview UI
+                            src: URL.createObjectURL(imgBlob),
+                            thumb: URL.createObjectURL(thumbBlob),
+                            title: `Page ${i}`,
+                            
+                            // File Names for Reference Mode
+                            jsonFileName: jsonFileName,
+                            fileName: imgFileName,
+                            thumbFileName: thumbFileName
+                        });
+
+                        setProgress(i);
+                    }
+
+                    const content = await zip.generateAsync({ type: "blob" });
+                    setZipFile(content);
+                    setGeneratedPages(newPages);
+
+                } catch (error) {
+                    console.error("Conversion failed:", error);
+                    alert("Conversion failed. See console for details.");
+                } finally {
+                    setProcessing(false);
+                }
+            };
+
+            const downloadZip = () => {
+                if (zipFile) {
+                    saveAs(zipFile, `${file.name.replace('.pdf', '')}_converted.zip`);
+                }
+            };
+
+            // Helper to convert blob to base64 string
+            const blobToBase64 = (blob) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            };
+
+            const handleFinalAdd = async () => {
+                setProcessing(true);
+                try {
+                    let finalPages = [];
+
+                    if (addType === 'embed') {
+                        // Convert everything to Base64
+                        finalPages = await Promise.all(generatedPages.map(async (p) => {
+                            const srcBase64 = await blobToBase64(p.srcBlob);
+                            const thumbBase64 = await blobToBase64(p.thumbBlob);
+                            // For JSON in embed mode, we pass the object directly. 
+                            // The generator will stringify it into the HTML.
+                            return {
+                                title: p.title,
+                                src: srcBase64,
+                                thumb: thumbBase64,
+                                json: p.jsonObj // Pass object directly
+                            };
+                        }));
+                    } else {
+                        // Reference Mode
+                        finalPages = generatedPages.map(p => ({
+                            title: p.title,
+                            src: `${basePath}${p.fileName}`,
+                            thumb: `${basePath}${p.thumbFileName}`,
+                            json: `${basePath}${p.jsonFileName}`,
+                            // Store blobs internally so the Generator preview still works immediately
+                            // The generator logic will need to handle these _ keys
+                            _previewSrc: p.src,
+                            _previewThumb: p.thumb
+                        }));
+                    }
+
+                    onAddPages(finalPages);
+                    onClose();
+                } catch (e) {
+                    console.error(e);
+                    alert("Error preparing pages.");
+                } finally {
+                    setProcessing(false);
+                }
+            };
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
+                    <div className="bg-white w-full max-w-4xl h-[90vh] rounded-xl shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                            <h2 className="text-xl font-bold text-slate-800">PDF to Image Converter</h2>
+                            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full text-slate-500 hover:text-slate-800 transition-colors">
+                                <Icon name="X" size={20} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-8 bg-slate-50">
+                            
+                            {/* Drop Zone (Only show if no pages generated yet) */}
+                            {generatedPages.length === 0 && !processing && (
+                                <div 
+                                    className={`border-2 border-dashed rounded-lg p-10 text-center transition-colors mb-8 ${file ? 'border-green-400 bg-green-50' : 'border-slate-300 bg-white hover:bg-slate-50'}`}
+                                    onDragOver={handleDragOver}
+                                    onDrop={handleDrop}
+                                >
+                                    {file ? (
+                                        <div>
+                                            <p className="text-lg font-bold text-slate-700">{file.name}</p>
+                                            <p className="text-sm text-slate-500 mb-4">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                            <button onClick={() => setFile(null)} className="text-sm text-red-500 underline">Remove</button>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <p className="text-lg font-medium text-slate-600 mb-2">Drag and drop your PDF file here or</p>
+                                            <label className="inline-block bg-green-500 text-white px-6 py-2 rounded-md font-bold cursor-pointer hover:bg-green-600 transition-colors shadow-sm">
+                                                Browse
+                                                <input type="file" accept="application/pdf" className="hidden" onChange={handleFileChange} />
+                                            </label>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Settings (Hide during processing/review) */}
+                            {generatedPages.length === 0 && !processing && (
+                                <div className="bg-white rounded-lg p-6 shadow-sm border border-slate-200 mb-8">
+                                    <h3 className="text-lg font-bold text-slate-800 mb-4 text-center border-b pb-2">Settings</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 max-w-2xl mx-auto">
+                                        <div className="flex items-center justify-between">
+                                            <label className="font-bold text-sm text-slate-700">Page Height:</label>
+                                            <div className="flex items-center gap-2">
+                                                <input type="number" value={settings.pageHeight} onChange={e => setSettings({...settings, pageHeight: Number(e.target.value)})} className="border rounded p-1 w-20 text-center" />
+                                                <span className="text-xs text-slate-400">px</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center justify-between">
+                                            <label className="font-bold text-sm text-slate-700">Thumbnail Height:</label>
+                                            <div className="flex items-center gap-2">
+                                                <input type="number" value={settings.thumbHeight} onChange={e => setSettings({...settings, thumbHeight: Number(e.target.value)})} className="border rounded p-1 w-20 text-center" />
+                                                <span className="text-xs text-slate-400">px</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <label className="font-bold text-sm text-slate-700">Image Quality:</label>
+                                            <div className="flex items-center gap-2 w-1/2">
+                                                <input type="range" min="0.1" max="1.0" step="0.1" value={settings.quality} onChange={e => setSettings({...settings, quality: Number(e.target.value)})} className="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer" />
+                                                <span className="text-sm font-mono w-8">{settings.quality}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <label className="font-bold text-sm text-slate-700">Image Type:</label>
+                                            <select 
+                                                value={settings.format} 
+                                                onChange={e => setSettings({...settings, format: e.target.value, formatExt: e.target.value === 'image/webp' ? 'webp' : 'jpg'})}
+                                                className="border rounded p-1"
+                                            >
+                                                <option value="image/webp">WebP</option>
+                                                <option value="image/jpeg">JPEG</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="text-center mt-6">
+                                        <button 
+                                            onClick={convertPdf} 
+                                            disabled={!file}
+                                            className={`px-8 py-3 rounded-md font-bold text-lg shadow-lg transition-all ${file ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}`}
+                                        >
+                                            Convert PDF
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Processing Status */}
+                            {processing && (
+                                <div className="mb-8 mt-10">
+                                    <div className="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                                        <span>Processing...</span>
+                                        <span>{progress} / {total}</span>
+                                    </div>
+                                    <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden">
+                                        <div className="bg-green-500 h-4 rounded-full transition-all duration-300" style={{ width: `${total ? (progress / total) * 100 : 0}%` }}></div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Review & Import Mode */}
+                            {generatedPages.length > 0 && !processing && (
+                                <div>
+                                    {/* Success Header */}
+                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center mb-6">
+                                        <p className="text-green-800 font-bold mb-4">Conversion completed! {generatedPages.length} pages generated.</p>
+                                        <div className="flex justify-center gap-4">
+                                            <button onClick={downloadZip} className="bg-white border border-green-600 text-green-700 hover:bg-green-50 px-6 py-2 rounded shadow-sm font-bold flex items-center gap-2">
+                                                <Icon name="FileText" size={18} /> Download ZIP
+                                            </button>
+                                            {importMode === 'review' && (
+                                                <button onClick={() => setImportMode('options')} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded shadow-md font-bold flex items-center gap-2">
+                                                    <Icon name="Plus" size={18} /> Add to Pages...
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Import Options UI */}
+                                    {importMode === 'options' && (
+                                        <div className="bg-slate-100 p-6 rounded-lg border border-slate-300 mb-6 animate-in fade-in zoom-in duration-300">
+                                            <h3 className="font-bold text-lg text-slate-800 mb-4">Import Options</h3>
+                                            
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                                <div 
+                                                    onClick={() => setAddType('embed')}
+                                                    className={`cursor-pointer border-2 rounded-lg p-4 transition-all ${addType === 'embed' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300'}`}
+                                                >
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <div className={`w-4 h-4 rounded-full border border-slate-400 flex items-center justify-center ${addType === 'embed' ? 'border-blue-500' : ''}`}>
+                                                            {addType === 'embed' && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
+                                                        </div>
+                                                        <span className="font-bold text-slate-800">Embed (Base64)</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 ml-6">
+                                                        Images are embedded directly into the HTML file. 
+                                                        <br/><strong>Pros:</strong> Single file, easy to share. 
+                                                        <br/><strong>Cons:</strong> Very large file size, slower load.
+                                                    </p>
+                                                </div>
+
+                                                <div 
+                                                    onClick={() => setAddType('reference')}
+                                                    className={`cursor-pointer border-2 rounded-lg p-4 transition-all ${addType === 'reference' ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300'}`}
+                                                >
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <div className={`w-4 h-4 rounded-full border border-slate-400 flex items-center justify-center ${addType === 'reference' ? 'border-blue-500' : ''}`}>
+                                                            {addType === 'reference' && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
+                                                        </div>
+                                                        <span className="font-bold text-slate-800">Reference (Files)</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 ml-6">
+                                                        Links to external files. You must upload the ZIP contents to a folder.
+                                                        <br/><strong>Pros:</strong> Fast loading, standard practice.
+                                                        <br/><strong>Cons:</strong> Requires uploading files.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {addType === 'reference' && (
+                                                <div className="mb-6 ml-1 pl-4 border-l-2 border-slate-300">
+                                                    <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Base Folder Path</label>
+                                                    <div className="flex items-center gap-2">
+                                                        <input 
+                                                            type="text" 
+                                                            value={basePath} 
+                                                            onChange={e => setBasePath(e.target.value)} 
+                                                            className="border border-slate-300 rounded p-2 w-full max-w-md font-mono text-sm"
+                                                            placeholder="pages/"
+                                                        />
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-400 mt-1">
+                                                        Preview: <code>{basePath}1.{settings.formatExt}</code>
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            <div className="flex justify-end gap-2">
+                                                <button onClick={() => setImportMode('review')} className="text-slate-500 hover:text-slate-700 font-medium text-sm px-4">Cancel</button>
+                                                <button onClick={handleFinalAdd} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded shadow-md font-bold">
+                                                    Confirm Import
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Preview Grid */}
+                                    <h4 className="font-bold text-slate-700 mb-2">Preview Pages</h4>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                        {generatedPages.map((page, i) => (
+                                            <div key={i} className="bg-white p-2 rounded shadow border border-slate-200">
+                                                <div className="aspect-[1/1.4] bg-slate-100 mb-2 overflow-hidden rounded relative group">
+                                                    <img src={page.thumb} alt="" className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs p-2 text-center">
+                                                        {page.fileName}
+                                                    </div>
+                                                </div>
+                                                <p className="text-center text-xs text-slate-500 font-mono">Page {i+1}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- LAYOUT PRESETS ---
         const LAYOUT_PRESETS = {
-            "1": { /* Default/Reset */ },
-            "2": {
-                currentPage: { vAlign: 'bottom', hAlign: 'center' },
-                btnAutoplay: { hAlign: 'left' },
-                btnSound: { hAlign: 'left' },
-                btnExpand: { hAlign: 'right' },
-                btnZoomIn: { hAlign: 'right' },
-                btnZoomOut: { hAlign: 'right' },
-                btnSearch: { hAlign: 'left' },
-                btnBookmark: { hAlign: 'left' },
-                btnToc: { hAlign: 'left' },
-                btnThumbs: { hAlign: 'left' },
-                btnShare: { hAlign: 'right' },
-                btnPrint: { hAlign: 'right' },
-                btnDownloadPages: { hAlign: 'right' },
-                btnDownloadPdf: { hAlign: 'right' },
-                btnSelect: { hAlign: 'right' }
+            "1": {},
+            "2": { currentPage: { vAlign: 'bottom', hAlign: 'center' }, btnAutoplay: { hAlign: 'left' }, btnSound: { hAlign: 'left' }, btnExpand: { hAlign: 'right' }, btnZoomIn: { hAlign: 'right' }, btnZoomOut: { hAlign: 'right' }, btnSearch: { hAlign: 'left' }, btnBookmark: { hAlign: 'left' }, btnToc: { hAlign: 'left' }, btnThumbs: { hAlign: 'left' }, btnShare: { hAlign: 'right' }, btnPrint: { hAlign: 'right' }, btnDownloadPages: { hAlign: 'right' }, btnDownloadPdf: { hAlign: 'right' }, btnSelect: { hAlign: 'right' } },
+            "3": { menuTransparent: true, menu2Transparent: false, menu2OverBook: false, menu2Padding: 5, btnMargin: 5, currentPage: { vAlign: 'top', hAlign: 'center' }, btnPrint: { vAlign: 'top', hAlign: 'right' }, btnDownloadPdf: { vAlign: 'top', hAlign: 'right' }, btnDownloadPages: { vAlign: 'top', hAlign: 'right' }, btnThumbs: { vAlign: 'top', hAlign: 'left' }, btnToc: { vAlign: 'top', hAlign: 'left' }, btnBookmark: { vAlign: 'top', hAlign: 'left' }, btnSearch: { vAlign: 'top', hAlign: 'left' }, btnSelect: { vAlign: 'top', hAlign: 'right' }, btnShare: { vAlign: 'top', hAlign: 'right' }, btnAutoplay: { hAlign: 'right' }, btnExpand: { hAlign: 'right' }, btnZoomIn: { hAlign: 'right' }, btnZoomOut: { hAlign: 'right' }, btnSound: { hAlign: 'right' }, menuPadding: 5 },
+            "4": { menu2Transparent: false, menu2OverBook: false, sideMenuOverMenu2: false, currentPage: { vAlign: 'top', hAlign: 'center' }, btnAutoplay: { vAlign: 'top', hAlign: 'left' }, btnSound: { vAlign: 'top', hAlign: 'left' }, btnExpand: { vAlign: 'top', hAlign: 'right' }, btnZoomIn: { vAlign: 'top', hAlign: 'right' }, btnZoomOut: { vAlign: 'top', hAlign: 'right' }, btnSearch: { vAlign: 'top', hAlign: 'left' }, btnBookmark: { vAlign: 'top', hAlign: 'left' }, btnToc: { vAlign: 'top', hAlign: 'left' }, btnThumbs: { vAlign: 'top', hAlign: 'left' }, btnShare: { vAlign: 'top', hAlign: 'right' }, btnPrint: { vAlign: 'top', hAlign: 'right' }, btnDownloadPages: { vAlign: 'top', hAlign: 'right' }, btnDownloadPdf: { vAlign: 'top', hAlign: 'right' }, btnSelect: { vAlign: 'top', hAlign: 'right' } }
+        };
+
+        const HEBREW_PRESET = {
+            rightToLeft: true,
+            preloaderText: "טוען, נא להמתין...",
+            strings: {
+                print: "הדפס",
+                printLeftPage: "הדפס עמוד שמאלי",
+                printRightPage: "הדפס עמוד ימני",
+                printCurrentPage: "הדפס עמוד נוכחי",
+                printAllPages: "הדפס את כל המסמך",
+                download: "הורד",
+                downloadLeftPage: "הורד עמוד שמאלי",
+                downloadRightPage: "הורד עמוד ימני",
+                downloadCurrentPage: "הורד עמוד נוכחי",
+                downloadAllPages: "הורד את כל העמודים",
+                bookmarks: "סימניות",
+                bookmarkLeftPage: "הוסף סימניה לעמוד השמאלי",
+                bookmarkRightPage: "הוסף סימניה לעמוד הימני",
+                bookmarkCurrentPage: "הוסף סימניה לעמוד נוכחי",
+                search: "חיפוש",
+                findInDocument: "מצא במסמך",
+                pagesFoundContaining: "עמודים נמצאו הכוללים",
+                noMatches: "אין תוצאות",
+                matchesFound: 'תוצאות נמצאו',
+                page: 'עמוד',
+                matches: 'תוצאות',
+                thumbnails: "סמליל",
+                tableOfContent: "תוכן הענינים",
+                share: "שיתוף",
+                notes: "הערות",
+                pressEscToClose: "לסגירה ESC לחץ",
+                password: "סיסמה",
+                addNote: "הוספת הערה",
+                typeInYourNote: "הקלד את ההערה"
             },
-            "3": {
-                menuTransparent: true,
-                menu2Transparent: false,
-                menu2OverBook: false,
-                menu2Padding: 5,
-                btnMargin: 5,
-                currentPage: { vAlign: 'top', hAlign: 'center' },
-                btnPrint: { vAlign: 'top', hAlign: 'right' },
-                btnDownloadPdf: { vAlign: 'top', hAlign: 'right' },
-                btnDownloadPages: { vAlign: 'top', hAlign: 'right' },
-                btnThumbs: { vAlign: 'top', hAlign: 'left' },
-                btnToc: { vAlign: 'top', hAlign: 'left' },
-                btnBookmark: { vAlign: 'top', hAlign: 'left' },
-                btnSearch: { vAlign: 'top', hAlign: 'left' },
-                btnSelect: { vAlign: 'top', hAlign: 'right' },
-                btnShare: { vAlign: 'top', hAlign: 'right' },
-                btnAutoplay: { hAlign: 'right' },
-                btnExpand: { hAlign: 'right' },
-                btnZoomIn: { hAlign: 'right' },
-                btnZoomOut: { hAlign: 'right' },
-                btnSound: { hAlign: 'right' },
-                menuPadding: 5
-            },
-            "4": {
-                menu2Transparent: false,
-                menu2OverBook: false,
-                sideMenuOverMenu2: false,
-                currentPage: { vAlign: 'top', hAlign: 'center' },
-                btnAutoplay: { vAlign: 'top', hAlign: 'left' },
-                btnSound: { vAlign: 'top', hAlign: 'left' },
-                btnExpand: { vAlign: 'top', hAlign: 'right' },
-                btnZoomIn: { vAlign: 'top', hAlign: 'right' },
-                btnZoomOut: { vAlign: 'top', hAlign: 'right' },
-                btnSearch: { vAlign: 'top', hAlign: 'left' },
-                btnBookmark: { vAlign: 'top', hAlign: 'left' },
-                btnToc: { vAlign: 'top', hAlign: 'left' },
-                btnThumbs: { vAlign: 'top', hAlign: 'left' },
-                btnShare: { vAlign: 'top', hAlign: 'right' },
-                btnPrint: { vAlign: 'top', hAlign: 'right' },
-                btnDownloadPages: { vAlign: 'top', hAlign: 'right' },
-                btnDownloadPdf: { vAlign: 'top', hAlign: 'right' },
-                btnSelect: { vAlign: 'top', hAlign: 'right' }
-            }
+            btnMore: { title: "עוד" },
+            // Explicitly overriding all buttons to ensure tooltips are Hebrew
+            currentPage: { title: "עמוד נוכחי" },
+            btnFirst: { title: "עמוד ראשון" },
+            btnPrev: { title: "עמוד קודם" },
+            btnNext: { title: "עמוד הבא" },
+            btnLast: { title: "עמוד אחרון" },
+            btnZoomIn: { title: "הגדל" },
+            btnZoomOut: { title: "הקטן" },
+            btnRotateLeft: { title: "סובב שמאלה" },
+            btnRotateRight: { title: "סובב ימינה" },
+            btnAutoplay: { title: "ניגון אוטומטי" },
+            btnSearch: { title: "חיפוש" },
+            btnSelect: { title: "כלי בחירה" },
+            btnBookmark: { title: "סימניה" },
+            btnNotes: { title: "הערות" },
+            btnToc: { title: "תוכן עניינים" },
+            btnThumbs: { title: "תמונות מוקטנות" },
+            btnShare: { title: "שיתוף" },
+            btnPrint: { title: "הדפסה" },
+            btnDownloadPages: { title: "הורדת עמודים" },
+            btnDownloadPdf: { title: "הורדת PDF" },
+            btnSound: { title: "שמע" },
+            btnExpand: { title: "מסך מלא" },
+            btnClose: { title: "סגור" },
+            
+            // Social Overrides
+            whatsapp: { title: "ווטסאפ" },
+            twitter: { title: "טוויטר (X)" },
+            facebook: { title: "פייסבוק" },
+            pinterest: { title: "פינטרסט" },
+            email: { title: "מייל" },
+            linkedin: { title: "לינקדאין" },
+            digg: { title: "דיג" },
+            reddit: { title: "רדיט" },
+            link: { title: "קישור" }
         };
 
         const tooltips = {
+            // Source
             pdfUrl: "Url to the PDF file. You can use relative or absolute path.",
-            licenseKey: "Your commercial license key for Real3D FlipBook.",
             name: "Project Name. Used for internal reference or specific download filenames.",
-            pages: "Array of page objects (images/html). Use the Page Manager to edit.",
-            tableOfContent: "Array of TOC items. Use the TOC Manager to edit.",
-            assets: "Paths to static assets like sounds and preloader images.",
             pdfAutoLinks: "Automatically detect and create links from the PDF text.",
             disableAutoFetch: "Prevent automatic fetching of the next PDF chunks.",
             loadAllPages: "Load all pages on start. Good for small books, bad for memory on large ones.",
             loadPagesF: "Number of pages to pre-load forward.",
             loadPagesB: "Number of pages to keep in memory backward.",
+            assets: "Paths to static assets like sounds and preloader images.",
+            pdfTextLayer: "Enable text selection and search (requires hidden text layer). Must be TRUE for Search to work.",
+            includeFontAwesome: "Injects FontAwesome CSS from CDN. Required for default icons like Search, Print, etc.",
+            includeMaterialIcons: "Injects Google Material Icons CSS from CDN. Required if using Material Icons.",
+            
+            // Appearance
             skin: "Predefined color schemes: 'light', 'dark', or 'gradient'.",
             layout: "UI Layout preset (1-4). Changing this Auto-Sets other options.",
-            skinColor: "Primary skin color (CSS).",
-            skinBackground: "Secondary skin color (CSS).",
             backgroundColor: "Background color of the book container (CSS value, e.g., #333 or rgba(0,0,0,0.5)).",
-            backgroundImage: "URL for a background image.",
+            backgroundImage: "URL for a background image. E.g. 'url(img/bg.jpg)'",
             backgroundPattern: "URL for a repeating background pattern.",
             backgroundTransparent: "Make the book background transparent.",
+            skinColor: "Primary skin color (CSS). E.g. #ff0000 or rgba(255,0,0,1)",
+            skinBackground: "Secondary skin color (CSS).",
+            googleFontsUrl: "URL to import Google Fonts (e.g. https://fonts.googleapis.com/css?family=Roboto).",
+            googleAnalyticsTrackingCode: "GA Tracking ID.",
             logoImg: "URL for a logo image to display over the book.",
             logoUrl: "URL to open when the logo is clicked.",
             logoCSS: "CSS positioning for the logo (e.g., 'top: 10px; left: 10px;').",
             preloaderText: "Text to display while loading.",
+            cover: "Show the first page as a cover (single page).",
+            scaleCover: "Scale the cover page to match the book height.",
+            backCover: "Show the last page as a back cover.",
+            pageCaptions: "Show page numbers/captions below pages.",
+
+            // VIEW
             viewMode: "Animation mode: 'webgl' (realistic 3D), '3d' (CSS3D), '2d' (no skew), 'swipe' (horizontal scroll), or 'simple' (no animation).",
             rightToLeft: "Enable for RTL languages like Arabic or Hebrew. Book opens from left.",
             singlePageMode: "Forces single page view even on large screens.",
@@ -208,32 +846,95 @@
             responsiveView: "Enable responsive view adjustments.",
             responsiveViewRatio: "Ratio threshold for responsive view.",
             minPixelRatio: "Minimum pixel ratio (1-2) for rendering. 1.5 offers good balance of fps/quality.",
+            responsiveHeight: "Adjust container height based on aspect ratio.",
+            containerRatio: "Aspect ratio for the container (e.g. 16/9 or 1.77).",
+            
+            // UI
             menuOverBook: "If true, the bottom menu floats over the book content instead of pushing it up.",
             menuFloating: "Makes the menu float with a margin/radius rather than spanning full width.",
             menuTransparent: "Make the bottom menu background transparent.",
-            menuBackground: "CSS background for the bottom menu.",
+            menuBackground: "CSS background for the bottom menu. Accepts Colors, Images, Gradients. E.g. #000 or linear-gradient(...).",
             menuShadow: "CSS box-shadow for the bottom menu.",
             menuPadding: "Padding for the bottom menu (px).",
             menu2OverBook: "Top menu floats over book.",
             menu2Transparent: "Make the top menu background transparent.",
             menu2Padding: "Padding for the top menu (px).",
             sideMenuPosition: "Position of the side menu ('left' or 'right').",
-            btnOrder: "Array defining the order of buttons in the toolbar.",
+            sideMenuOverBook: "Side menu floats over book.",
+            
+            // BUTTON STYLING
             btnColor: "Color of the toolbar button icons (CSS value).",
-            btnBackground: "Background color of the toolbar buttons.",
+            btnBackground: "Background color of the toolbar buttons (CSS Value).",
             btnRadius: "Border radius of toolbar buttons (px).",
             btnSize: "Size of toolbar icons (px).",
             btnMargin: "Margin between toolbar buttons (px).",
             sideBtnColor: "Color of the side navigation arrows.",
             sideBtnSize: "Size of the side navigation arrows (px).",
+            sideBtnPaddingV: "Vertical padding for side arrows.",
+            sideBtnBackground: "Background color of side navigation arrows.",
+            
+            // HOVER STYLES
+            btnColorHover: "Color of toolbar icons on hover.",
+            btnBackgroundHover: "Background color of toolbar buttons on hover.",
+            sideBtnColorHover: "Color of side arrows on hover.",
+            sideBtnBackgroundHover: "Background color of side arrows on hover.",
+            floatingBtnColor: "Color of floating menu buttons.",
+            floatingBtnBackground: "Background of floating menu buttons.",
+            floatingBtnColorHover: "Hover color of floating menu buttons.",
+            floatingBtnBackgroundHover: "Hover background of floating menu buttons.",
+            
+            // BUTTONS VISIBILITY
+            btnFirst: "Show/Hide First Page button. Default: Top-Left (Layout 1).",
+            btnPrev: "Show/Hide Previous Page button. Default: Top-Left (Layout 1).",
+            btnNext: "Show/Hide Next Page button. Default: Top-Left (Layout 1).",
+            btnLast: "Show/Hide Last Page button. Default: Top-Left (Layout 1).",
+            btnZoomIn: "Show/Hide Zoom In button. Default: Top-Left (Layout 1).",
+            btnZoomOut: "Show/Hide Zoom Out button. Default: Top-Left (Layout 1).",
+            btnRotateLeft: "Show/Hide Rotate Left button. Default: Top-Left (Layout 1).",
+            btnRotateRight: "Show/Hide Rotate Right button. Default: Top-Left (Layout 1).",
+            btnAutoplay: "Show/Hide Autoplay button. Default: Top-Left (Layout 1).",
+            btnSearch: "Show/Hide Search button. Requires 'PDF Text Layer' to be enabled in Source tab.",
+            btnSelect: "Show/Hide Text Selection tool. Default: Top-Left (Layout 1).",
+            btnBookmark: "Show/Hide Bookmark button. Default: Top-Left (Layout 1).",
+            btnNotes: "Show/Hide Notes button. Default: Top-Left (Layout 1).",
+            btnToc: "Show/Hide Table of Contents button. Default: Top-Left (Layout 1).",
+            btnThumbs: "Show/Hide Thumbnails button. Default: Top-Left (Layout 1).",
+            btnShare: "Show/Hide Share button. Default: Top-Left (Layout 1).",
+            btnPrint: "Show/Hide Print button. Default: Top-Left (Layout 1).",
+            btnDownloadPages: "Show/Hide Download Pages button. Default: Top-Left (Layout 1).",
+            btnDownloadPdf: "Show/Hide Download PDF button. Default: Top-Left (Layout 1).",
+            btnSound: "Show/Hide Sound button. Default: Top-Left (Layout 1).",
+            btnExpand: "Show/Hide Fullscreen button. Default: Top-Left (Layout 1).",
+            btnClose: "Show/Hide Close button (for Lightbox). Default: Top-Right.",
+            btnMore: "Overflow menu button for small screens. Default: Top-Right.",
+            btnOrder: "Array defining the order of buttons in the toolbar.",
+            
+            // SOCIAL ICONS
+            whatsapp: "Enable WhatsApp sharing button. Title customizable via Toolbar menu.",
+            twitter: "Enable Twitter sharing button. Title customizable via Toolbar menu.",
+            facebook: "Enable Facebook sharing button. Title customizable via Toolbar menu.",
+            pinterest: "Enable Pinterest sharing button. Title customizable via Toolbar menu.",
+            email: "Enable Email sharing button. Title customizable via Toolbar menu.",
+            linkedin: "Enable LinkedIn sharing button. Title customizable via Toolbar menu.",
+            digg: "Enable Digg sharing button. Title customizable via Toolbar menu.",
+            reddit: "Enable Reddit sharing button. Title customizable via Toolbar menu.",
+            shareUrl: "Custom URL to share. Defaults to current page URL.",
+            shareTitle: "Custom title for shared content.",
+            shareImage: "Custom image URL for shared content.",
+
+            // BEHAVIOR
             touchSwipeEnabled: "Enable swiping on touch devices to turn pages.",
             flipSound: "Play sound effect when turning pages.",
+            flipMp3: "URL to custom flip sound mp3 file. Leave empty for default.",
             backgroundMusic: "URL to background music file (mp3).",
             autoplayOnStart: "Start turning pages automatically when the book loads.",
-            zoomStep: "Factor to zoom in/out on each click.",
-            zoomMax2: "Second level max zoom factor.",
+            autoplayStartPage: "Page number to start autoplay from.",
+            zoomStep: "Factor to zoom in/out on each click (default: 2).",
+            zoomMax2: "Second level max zoom factor (default: null).",
+            zoomTime: "Duration of zoom animation in ms (default: 300).",
             zoomReset: "Reset zoom level when changing pages.",
             deeplinkingEnabled: "Enable URL hash changes (e.g., #page1) for deep linking.",
+            deeplinkingPrefix: "Prefix for the URL hash (e.g. 'book1_'). Result: #book1_1",
             rightClickEnabled: "Allow right-click context menu.",
             pageDragDisabled: "Disable dragging pages with mouse.",
             pageClickAreaWdith: "Width of the edge area that triggers page turn (e.g., '10%').",
@@ -242,30 +943,58 @@
             contentOnStart: "Open Table of Contents sidebar on load.",
             thumbnailsOnStart: "Open Thumbnails sidebar on load.",
             searchOnStart: "Open Search sidebar on load.",
-            pan: "Camera panoramic angle (horizontal rotation) in degrees.",
-            tilt: "Camera tilt angle (vertical rotation) in degrees.",
+
+            // WEBGL
+            panMax: "Maximum panoramic angle (horizontal) in degrees.",
+            tiltMax: "Maximum tilt angle (vertical) in degrees.",
             lights: "Enable dynamic lighting in WebGL mode.",
+            lightIntensity: "Intensity of the WebGL lights (0-1).",
+            shadowOpacity: "Opacity of the WebGL shadows (0-1).",
             webglShadows: "Enable realistic shadows in WebGL mode (performance intensive).",
             pageHardness: "How much the pages bend. Lower values = more flexible paper.",
+            pageRoughness: "Roughness of the page material (0-1).",
             pageTextureSize: "Resolution of page textures (e.g., 2048). Higher = sharper but more memory.",
             pageTextureSizeSmall: "Texture size for small screens/thumbnails.",
+            thumbTextureSize: "Texture size for thumbnails.",
             disableImageResize: "Disable automatic resizing of images to powers of 2 (needed for some filtering).",
             antialias: "Enable WebGL antialiasing (smoother edges, higher cost).",
+
+            // ADVANCED
             rangeChunkSize: "Size of PDF chunks to fetch (in KB). Tuning this can improve load perf.",
             disableStream: "Disable PDF streaming (fetches full file).",
             disableRange: "Disable range requests.",
             pdfBrowserViewerIfMobile: "Open native PDF viewer on mobile instead of Flipbook.",
+            pdfBrowserViewerIfIE: "Use native PDF viewer for Internet Explorer.",
+            pdfBrowserViewerFullscreenTarget: "Target window for native viewer (e.g. _blank).",
             printMenu: "Enable the Print menu options.",
             linkColor: "Color of links overlay on pages.",
-            cover: "Show the first page as a cover (single page).",
-            backCover: "Show the last page as a back cover.",
+            linkColorHover: "Hover color for links.",
             noteTypes: "Configuration for annotation note types (User, Group, Admin).",
             minimumAndroidVersion: "Minimum Android version required to run.",
             pageRangeStart: "Start page index for PDF rendering limitation.",
             pageRangeEnd: "End page index for PDF rendering limitation.",
+            customCSS: "Raw CSS to inject into the page for advanced styling overrides.",
+            
+            // LIGHTBOX
+            lightBox: "Open book in a lightbox modal overlay (starts hidden).",
+            lightboxCloseOnClick: "Close the lightbox when clicking the dark background overlay.",
+            lightboxBackground: "CSS background for the lightbox overlay (e.g., rgba(0,0,0,0.8)).",
+            
+            // DOWNLOADS
             btnDownloadPagesUrl: "URL to the zip file containing all pages.",
             btnDownloadPdfUrl: "URL to the PDF file for download.",
-            btnDownloadPdfOpenInNewWindow: "Open PDF download in a new window."
+            btnDownloadPdfOpenInNewWindow: "Open PDF download in a new window.",
+            
+            // MENU FONTS
+            menuFontSize: "Font size for menu items (e.g. 14px).",
+            menuFontColor: "Font color for menu items (e.g. #FFF).",
+            
+            // Localized Strings
+            password: "Label for the password input field. Used ONLY when opening PDF files encrypted with an OPEN PASSWORD.",
+            
+            // Customizer Helpers
+            iconM: "Material Icon class (e.g. 'search'). Lower priority than FontAwesome. Requires 'Include Material Icons' to be enabled in Source tab.",
+            iconFA: "FontAwesome class (e.g. 'fas fa-search'). Higher priority than Material Icons."
         };
 
         const defaultOptions = {
@@ -281,8 +1010,9 @@
             disableRange: false,
             disableStream: true,
             disableAutoFetch: true,
-            pdfAutoLinks: false,
+            pdfAutoLinks: true,
             htmlLayer: true,
+            pdfTextLayer: true,
             loadAllPages: false,
             loadPagesF: 2,
             loadPagesB: 1,
@@ -297,7 +1027,7 @@
             backgroundPattern: "",
             backgroundTransparent: false,
             logoImg: '', logoUrl: '', logoCSS: 'position:absolute;', logoHideOnMobile: false,
-            preloaderText: '',
+            preloaderText: 'Loading, Please Wait...',
             fillPreloader: { enabled: false, imgEmpty: "images/logo_light.png", imgFull: "images/logo_dark.png" },
             viewMode: 'webgl',
             rightToLeft: false,
@@ -311,6 +1041,10 @@
             minPixelRatio: 1,
             pageFlipDuration: 1,
             thumbSize: 130,
+            scaleCover: false,
+            pageCaptions: false,
+            responsiveHeight: false,
+            containerRatio: "",
             menuOverBook: false,
             menuFloating: false,
             menuBackground: '',
@@ -343,7 +1077,7 @@
                 'btnSelect', 'btnBookmark', 'btnNotes', 'btnToc', 'btnThumbs', 'btnShare', 
                 'btnPrint', 'btnDownloadPages', 'btnDownloadPdf', 'btnSound', 'btnExpand', 'btnClose'
             ],
-            currentPage: { enabled: true, title: "Current page", vAlign: 'top', hAlign: 'left' },
+            currentPage: { enabled: true, title: "Current page", vAlign: 'top', hAlign: 'left', iconFA: '' },
             btnFirst: { enabled: false, title: "First page", iconFA: "flipbook-icon-angle-double-left", iconM: "flipbook-icon-first_page", vAlign: 'top', hAlign: 'left' },
             btnPrev: { enabled: true, title: "Previous page", iconFA: "flipbook-icon-angle-left", iconM: "flipbook-icon-keyboard_arrow_left", vAlign: 'top', hAlign: 'left' },
             btnNext: { enabled: true, title: "Next page", iconFA: "flipbook-icon-angle-right", iconM: "flipbook-icon-keyboard_arrow_right", vAlign: 'top', hAlign: 'left' },
@@ -366,8 +1100,10 @@
             btnSound: { enabled: true, title: "Volume", iconFA: "flipbook-icon-volume-up", hideOnMobile: true, vAlign: 'top', hAlign: 'left' },
             btnExpand: { enabled: true, title: "Toggle fullscreen", iconFA: "flipbook-icon-expand", iconM: "flipbook-icon-fullscreen", vAlign: 'top', hAlign: 'left' },
             btnClose: { title: "Close", iconFA: "flipbook-icon-times", iconM: "flipbook-icon-clear", hAlign: 'right', vAlign: 'top', size: 20 },
+            btnMore: { enabled: true, title: "More", iconFA: "flipbook-icon-more", iconM: "flipbook-icon-more_vert", vAlign: 'top', hAlign: 'right' },
+            
             btnShareIfMobile: false, btnSoundIfMobile: false, btnPrintIfMobile: false,
-            sound: true, flipSound: true, backgroundMusic: false, autoplayOnStart: false, autoplayInterval: 3000, autoplayLoop: true,
+            sound: true, flipSound: true, backgroundMusic: "", autoplayOnStart: false, autoplayInterval: 3000, autoplayLoop: true, autoplayStartPage: 1,
             zoomMin: .95, zoomMax2: null, zoomSize: null, zoomStep: 2, zoomTime: 300, zoomReset: false, zoomResetTime: 300,
             doubleClickZoomDisabled: false, pageDragDisabled: false, pageClickAreaWdith: '10%',
             wheelDisabledNotFullscreen: false, arrowsDisabledNotFullscreen: false, arrowsAlwaysEnabledForNavigation: true, touchSwipeEnabled: true,
@@ -387,9 +1123,16 @@
             antialias: false, disableImageResize: true,
             pageTextureSize: 2048, pageTextureSizeSmall: 1500, thumbTextureSize: 300,
             shareUrl: null, shareTitle: null, shareImage: null,
-            whatsapp: { enabled: true }, twitter: { enabled: true }, facebook: { enabled: true }, pinterest: { enabled: true },
-            email: { enabled: true }, linkedin: { enabled: true }, digg: { enabled: false }, reddit: { enabled: false },
-            assets: { preloader: "images/preloader.jpg", overlay: "images/overlay.png", flipMp3: "mp3/turnPage.mp3", spinner: "images/spinner.gif", backgroundMp3: "mp3/background.mp3" },
+            whatsapp: { enabled: true, title: "WhatsApp" }, 
+            twitter: { enabled: true, title: "X (Twitter)" }, 
+            facebook: { enabled: true, title: "Facebook" }, 
+            pinterest: { enabled: true, title: "Pinterest" },
+            email: { enabled: true, title: "Email" }, 
+            linkedin: { enabled: true, title: "LinkedIn" }, 
+            digg: { enabled: false, title: "Digg" }, 
+            reddit: { enabled: false, title: "Reddit" },
+            link: { enabled: false, title: "Link", icon: "flipbook-icon-link" },
+            assets: { preloader: "images/preloader.jpg", overlay: "images/overlay.png", flipMp3: "", spinner: "images/spinner.gif", backgroundMp3: "mp3/background.mp3" },
             strings: {
                 print: "Print", download: "Download", bookmarks: "Bookmarks", search: "Search", thumbnails: "Thumbnails", tableOfContent: "Table of Contents", share: "Share", notes: "Notes",
                 printLeftPage: "Print left page", printRightPage: "Print right page", printCurrentPage: "Print current page", printAllPages: "Print all pages",
@@ -408,136 +1151,18 @@
             pdfTextLayer: true, annotationLayer: true,
             printMenu: true, downloadMenu: true, cover: true, backCover: true,
             linkColor: 'rgba(0, 0, 0, 0)', linkColorHover: 'rgba(255, 255, 0, 1)', linkOpacity: 0.4, linkTarget: '_blank',
+            googleFontsUrl: "",
+            customCSS: "",
+            shareUrl: "",
+            shareTitle: "",
+            shareImage: "",
+            
             noteTypes: [
                 { id: 1, title: "User", color: "green", enabled: true },
                 { id: 2, title: "Group", color: "yellow", enabled: true },
                 { id: 3, title: "Admin", color: "blue", enabled: true },
             ]
         };
-
-        const FieldWrapper = ({ label, helpKey, isMobile, hasOverride, children }) => (
-            <div className={`mb-3 relative ${isMobile && hasOverride ? 'border-l-2 border-purple-500 pl-3 -ml-3' : ''}`}>
-                <div className="flex justify-between items-center mb-1">
-                     <label className={`block text-xs font-bold uppercase tracking-wide flex items-center ${isMobile ? 'text-purple-600' : 'text-slate-500'}`}>
-                        {label}
-                        {helpKey && <div className="group relative inline-block ml-1 align-middle z-40">
-                            <InfoIcon />
-                            <div className="invisible group-hover:visible absolute z-50 w-64 p-3 mt-1 text-xs leading-relaxed text-white bg-slate-800 rounded-lg shadow-xl right-0 bottom-full mb-2 pointer-events-none origin-bottom-right">
-                              {tooltips[helpKey] || "No description available."}
-                              <div className="absolute right-1 -ml-1 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-800"></div>
-                            </div>
-                        </div>}
-                    </label>
-                    {isMobile && !hasOverride && <span className="text-[10px] text-slate-400 italic">Inherited</span>}
-                    {isMobile && hasOverride && <span className="text-[10px] text-purple-500 font-bold">Override Active</span>}
-                </div>
-                {children}
-            </div>
-        );
-
-        const Toggle = ({ label, checked, onChange, helpKey, isMobile, hasOverride }) => (
-          <div className={`flex items-center justify-between py-2 border-b border-slate-100 last:border-0 hover:bg-slate-50 px-2 rounded -mx-2 transition-colors ${isMobile && hasOverride ? 'bg-purple-50' : ''}`}>
-            <span className={`text-sm flex items-center ${isMobile ? 'text-purple-700' : 'text-slate-700'}`}>
-                {label}
-                {helpKey && <div className="group relative inline-block ml-1 align-middle z-40">
-                    <InfoIcon />
-                    <div className="invisible group-hover:visible absolute z-50 w-64 p-3 mt-1 text-xs leading-relaxed text-white bg-slate-800 rounded-lg shadow-xl right-0 bottom-full mb-2 pointer-events-none origin-bottom-right">
-                        {tooltips[helpKey] || "No description available."}
-                        <div className="absolute right-1 -ml-1 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-800"></div>
-                    </div>
-                </div>}
-            </span>
-            <button
-              onClick={() => onChange(!checked)}
-              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${checked ? (isMobile ? 'bg-purple-600' : 'bg-blue-600') : 'bg-slate-300'}`}
-            >
-              <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-4' : 'translate-x-0'}`} />
-            </button>
-          </div>
-        );
-
-        const TextInput = ({ label, value, onChange, placeholder, helpKey, isMobile, hasOverride }) => (
-          <FieldWrapper label={label} helpKey={helpKey} isMobile={isMobile} hasOverride={hasOverride}>
-            <input
-              type="text"
-              className={`block w-full rounded-md border text-sm p-2 shadow-sm focus:ring-1 
-                ${isMobile 
-                    ? 'border-purple-300 bg-purple-50 text-purple-900 focus:ring-purple-500 focus:border-purple-500' 
-                    : 'border-slate-300 bg-white text-slate-900 focus:ring-blue-500 focus:border-blue-500'
-                }`}
-              placeholder={isMobile && !hasOverride ? "Inherited from Desktop" : placeholder}
-              value={value === null || value === undefined ? '' : value}
-              onChange={(e) => onChange(e.target.value)}
-            />
-          </FieldWrapper>
-        );
-
-        const NumberInput = ({ label, value, onChange, step = 1, helpKey, isMobile, hasOverride }) => (
-            <FieldWrapper label={label} helpKey={helpKey} isMobile={isMobile} hasOverride={hasOverride}>
-              <input
-                type="number"
-                step={step}
-                className={`block w-full rounded-md border text-sm p-2 shadow-sm focus:ring-1 
-                    ${isMobile 
-                        ? 'border-purple-300 bg-purple-50 text-purple-900 focus:ring-purple-500 focus:border-purple-500' 
-                        : 'border-slate-300 bg-white text-slate-900 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
-                value={value === null || value === undefined ? '' : value}
-                onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-              />
-            </FieldWrapper>
-        );
-
-        const SelectInput = ({ label, value, onChange, options, helpKey, isMobile, hasOverride }) => (
-          <FieldWrapper label={label} helpKey={helpKey} isMobile={isMobile} hasOverride={hasOverride}>
-            <select
-              value={value === undefined ? '' : value}
-              onChange={(e) => onChange(e.target.value)}
-              className={`block w-full rounded-md border text-sm p-2 shadow-sm focus:ring-1 
-                ${isMobile 
-                    ? 'border-purple-300 bg-purple-50 text-purple-900 focus:ring-purple-500 focus:border-purple-500' 
-                    : 'border-slate-300 bg-white text-slate-900 focus:ring-blue-500 focus:border-blue-500'
-                }`}
-            >
-              {isMobile && <option value="">(Inherit)</option>}
-              {options.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </FieldWrapper>
-        );
-
-        const JsonInput = ({ label, value, onChange, helpKey, isMobile }) => {
-            const [error, setError] = useState(false);
-            const handleChange = (e) => {
-                try {
-                    const parsed = JSON.parse(e.target.value);
-                    onChange(parsed);
-                    setError(false);
-                } catch (err) {
-                    setError(true);
-                }
-            };
-            return (
-                <div className="mb-3">
-                     <label className={`block text-xs font-bold uppercase tracking-wide flex justify-between items-center mb-1 ${isMobile ? 'text-purple-600' : 'text-slate-500'}`}>
-                        <span className="flex items-center">{label} {helpKey && <div className="group relative inline-block ml-1 align-middle z-40">
-                            <InfoIcon />
-                            <div className="invisible group-hover:visible absolute z-50 w-64 p-3 mt-1 text-xs leading-relaxed text-white bg-slate-800 rounded-lg shadow-xl right-0 bottom-full mb-2 pointer-events-none origin-bottom-right">
-                                {tooltips[helpKey] || "No description available."}
-                                <div className="absolute right-1 -ml-1 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-800"></div>
-                            </div>
-                        </div>}</span>
-                        {error && <span className="text-red-500 lowercase font-normal">Invalid JSON</span>}
-                    </label>
-                    <textarea 
-                        className={`block w-full rounded-md border font-mono text-xs p-2 h-32 ${error ? 'border-red-500' : (isMobile ? 'border-purple-300 bg-purple-50' : 'border-slate-300 bg-slate-50')}`}
-                        defaultValue={JSON.stringify(value, null, 2)}
-                        onBlur={handleChange}
-                    />
-                </div>
-            )
-        }
 
         const TabButton = ({ active, label, icon: IconName, onClick }) => (
             <button
@@ -548,19 +1173,11 @@
                     : 'border-transparent text-slate-500 hover:text-slate-700'
                 }`}
             >
-                <Icon name={IconName} size={16} />
-                {label}
+                <div className="flex items-center">
+                    {IconName === 'Globe' && <span className="font-mono font-bold text-xs bg-slate-200 rounded px-1 mr-2">i18n</span>}
+                    <span>{label}</span>
+                </div>
             </button>
-        );
-
-        const Section = ({ title, children, icon: IconName }) => (
-            <div className="mb-8 border-b border-slate-100 pb-6 last:border-0 last:pb-0">
-                <h3 className="text-sm font-bold uppercase text-blue-600 mb-4 flex items-center gap-2">
-                    <Icon name={IconName} size={16} />
-                    {title}
-                </h3>
-                {children}
-            </div>
         );
 
         const Modal = ({ isOpen, onClose, title, children }) => {
@@ -571,7 +1188,7 @@
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
                             <h2 className="text-xl font-bold text-slate-800">{title}</h2>
                             <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-                                <Icon name="X" size={20} />
+                                <Icon name="X" size={18} />
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6">
@@ -589,12 +1206,17 @@
             const [activeTab, setActiveTab] = useState('source');
             const [showCopyFeedback, setShowCopyFeedback] = useState(false);
             const [editScope, setEditScope] = useState('global'); 
-            
+            const [includeFontAwesome, setIncludeFontAwesome] = useState(true);
+            const [includeMaterialIcons, setIncludeMaterialIcons] = useState(false);
+
             const [showPageManager, setShowPageManager] = useState(false);
+            const [showPdfConverter, setShowPdfConverter] = useState(false);
             const [editingPage, setEditingPage] = useState(null);
             const [pageEditData, setPageEditData] = useState({});
             const [showTocManager, setShowTocManager] = useState(false);
             const [selectedBtn, setSelectedBtn] = useState('btnZoomIn');
+            const [socialEditing, setSocialEditing] = useState(null); 
+            const [showOrderManual, setShowOrderManual] = useState(false);
 
             const getValue = (key) => {
                 if (editScope === 'mobile') {
@@ -645,6 +1267,13 @@
                     strings: { ...prev.strings, [key]: value }
                 }));
             };
+            
+            const updateAsset = (key, value) => {
+                setConfig(prev => ({
+                    ...prev,
+                    assets: { ...prev.assets, [key]: value }
+                }));
+            };
 
             const toggleButton = (btnName) => {
                 const currentVal = editScope === 'mobile' 
@@ -689,9 +1318,26 @@
                 }
             };
             
+            const updateSocialProp = (socialName, prop, value) => {
+                if (editScope === 'mobile') {
+                      setConfig(prev => ({
+                        ...prev,
+                        mobile: { 
+                            ...prev.mobile, 
+                            [socialName]: { ...(prev.mobile[socialName] || prev[socialName]), [prop]: value } 
+                        }
+                    }));
+                } else {
+                    setConfig(prev => ({
+                        ...prev,
+                        [socialName]: { ...prev[socialName], [prop]: value }
+                    }));
+                }
+            }
+            
             const updateButtonProp = (btnName, prop, value) => {
                  if (editScope === 'mobile') {
-                     setConfig(prev => ({
+                      setConfig(prev => ({
                         ...prev,
                         mobile: { 
                             ...prev.mobile, 
@@ -705,13 +1351,87 @@
                     }));
                  }
             };
+
+            const applyHebrewPreset = () => {
+                setConfig(prev => {
+                    const next = mergeObjects(prev, HEBREW_PRESET);
+                    // Force RTL explicitly in case merge didn't trigger deep update correctly on boolean
+                    next.rightToLeft = true;
+                    // Apply btnMore title separately as it's not a root-level property in HEBREW_PRESET mapping above
+                    next.btnMore = { ...next.btnMore, title: "עוד" }; 
+                    return next;
+                });
+            };
+
+            const resetLocalization = () => {
+                // Manually reset social titles to English defaults
+                const socialDefaults = {
+                    whatsapp: { title: "WhatsApp" }, 
+                    twitter: { title: "X (Twitter)" }, 
+                    facebook: { title: "Facebook" }, 
+                    pinterest: { title: "Pinterest" },
+                    email: { title: "Email" }, 
+                    linkedin: { title: "LinkedIn" }, 
+                    digg: { title: "Digg" }, 
+                    reddit: { title: "Reddit" },
+                    link: { title: "Link" }
+                };
+
+                // Reset standard buttons
+                const btnDefaults = {
+                    currentPage: { title: "Current page" },
+                    btnFirst: { title: "First page" },
+                    btnPrev: { title: "Previous page" },
+                    btnNext: { title: "Next page" },
+                    btnLast: { title: "Last page" },
+                    btnZoomIn: { title: "Zoom in" },
+                    btnZoomOut: { title: "Zoom out" },
+                    btnRotateLeft: { title: "Rotate left" },
+                    btnRotateRight: { title: "Rotate right" },
+                    btnAutoplay: { title: "Autoplay" },
+                    btnSearch: { title: "Search" },
+                    btnSelect: { title: "Select tool" },
+                    btnBookmark: { title: "Bookmark" },
+                    btnNotes: { title: "Notes" },
+                    btnToc: { title: "Table of Contents" },
+                    btnThumbs: { title: "Pages" },
+                    btnShare: { title: "Share" },
+                    btnPrint: { title: "Print" },
+                    btnDownloadPages: { title: "Download pages" },
+                    btnDownloadPdf: { title: "Download PDF" },
+                    btnSound: { title: "Volume" },
+                    btnExpand: { title: "Toggle fullscreen" },
+                    btnClose: { title: "Close" },
+                    btnMore: { title: "More" }
+                };
+
+                setConfig(prev => ({
+                    ...prev,
+                    strings: defaultOptions.strings,
+                    preloaderText: 'Loading, Please Wait...',
+                    rightToLeft: false,
+                    ...socialDefaults,
+                    ...btnDefaults
+                }));
+            };
             
+            const removeMobileOverride = (key) => {
+                const newMobile = { ...config.mobile };
+                delete newMobile[key];
+                setConfig(prev => ({ ...prev, mobile: newMobile }));
+            };
+
             const addNewPage = () => {
                 const newPage = { src: "", thumb: "", title: "", htmlContent: "", items: [] };
                 setConfig(prev => ({ ...prev, pages: [...prev.pages, newPage] }));
                 setEditingPage(config.pages.length); 
                 setPageEditData(newPage);
             };
+            
+            const handleAddConvertedPages = (newPages) => {
+                setConfig(prev => ({ ...prev, pages: [...prev.pages, ...newPages] }));
+            };
+
             const deletePage = (index) => setConfig(prev => ({ ...prev, pages: prev.pages.filter((_, i) => i !== index) }));
             const openEditPage = (index) => { setEditingPage(index); setPageEditData({ ...config.pages[index] }); };
             const savePageEdit = () => { const newPages = [...config.pages]; newPages[editingPage] = pageEditData; setConfig(prev => ({ ...prev, pages: newPages })); setEditingPage(null); };
@@ -724,6 +1444,17 @@
             const addTocEntry = () => setConfig(prev => ({ ...prev, tableOfContent: [...prev.tableOfContent, { title: "New Chapter", page: "1" }] }));
             const updateTocEntry = (index, key, value) => { const newToc = [...config.tableOfContent]; newToc[index] = { ...newToc[index], [key]: value }; setConfig(prev => ({ ...prev, tableOfContent: newToc })); };
             const removeTocEntry = (index) => setConfig(prev => ({ ...prev, tableOfContent: config.tableOfContent.filter((_, i) => i !== index) }));
+
+            // --- REORDER LIST LOGIC ---
+            const moveBtnOrder = (index, direction) => {
+                const newOrder = [...config.btnOrder];
+                if (direction === 'up' && index > 0) {
+                    [newOrder[index], newOrder[index - 1]] = [newOrder[index - 1], newOrder[index]];
+                } else if (direction === 'down' && index < newOrder.length - 1) {
+                    [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+                }
+                update('btnOrder', newOrder);
+            };
 
             const copyToClipboard = () => {
                 const code = generateFullHTML();
@@ -774,18 +1505,19 @@
                 
                 finalConfig.pdfUrl = config.pdfUrl;
                 if (config.layout && config.layout !== "1") finalConfig.layout = config.layout;
-                if (licenseKey) finalConfig.s = licenseKey;
+
+                // Sanitize Pages - Remove internal _preview keys for export
+                if (finalConfig.pages) {
+                    finalConfig.pages = finalConfig.pages.map(p => {
+                        const { _previewSrc, _previewThumb, ...rest } = p;
+                        return rest;
+                    });
+                }
 
                 let jsonString = JSON.stringify(finalConfig, null, 4);
                 jsonString = jsonString.replace(/"([^"]+)":/g, '$1:'); 
                 
                 const lines = jsonString.split('\n');
-                if (licenseKey) {
-                    const index = lines.findIndex(line => line.includes('s:'));
-                    if (index !== -1) {
-                        lines.splice(index, 0, `    // ⬇️ PASTE YOUR LICENSE KEY HERE ⬇️`);
-                    }
-                }
                 
                 const objectString = lines.join('\n');
 
@@ -800,54 +1532,98 @@
                     '    <meta charset="utf-8">',
                     '    <meta name="viewport" content="width=device-width, initial-scale=1.0">',
                     '    <title>Real3D FlipBook</title>',
-                    '    <link rel="stylesheet" type="text/css" href="css/flipbook.style.css">',
+                    '    <link rel="stylesheet" type="text/css" href="css/flipbook.min.css">',
                     '    <script src="js/flipbook.min.js"><\/script>'
                 ];
                 
-                if (framework === 'jquery') {
-                    htmlParts.push('    <script src="https://code.jquery.com/jquery-3.6.0.min.js"><\/script>');
+                if (includeFontAwesome) {
+                    htmlParts.splice(5, 0, '    <link rel="stylesheet" href="https://unpkg.com/@fortawesome/fontawesome-free/css/all.min.css">');
                 }
+                
+                if (includeMaterialIcons) {
+                    htmlParts.splice(6, 0, '    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">');
+                }
+
+                if (framework === 'jquery') {
+                     htmlParts.splice(5, 0, '    <script src="https://code.jquery.com/jquery-4.0.0.min.js"><\/script>');
+                }
+
+                if (config.googleFontsUrl) {
+                     htmlParts.splice(6, 0, `    <link href="${config.googleFontsUrl}" rel="stylesheet">`);
+                }
+
+                if (config.customCSS) {
+                    htmlParts.push(`    <style>\n${config.customCSS}\n    </style>`);
+                }
+
+                htmlParts.push('    <script type="text/javascript">');
+                htmlParts.push('      document.addEventListener("DOMContentLoaded", function () {');
+                htmlParts.push(scriptContent);
+                htmlParts.push('      });');
+                htmlParts.push('    <\/script>');
                 
                 htmlParts.push('</head>');
                 htmlParts.push('<body>');
                 htmlParts.push('    <div id="book-container" style="height: 100vh; width: 100%;"></div>');
-                htmlParts.push('    <script type="text/javascript">');
-                htmlParts.push(scriptContent);
-                htmlParts.push('    <\/script>');
                 htmlParts.push('</body>');
                 htmlParts.push('</html>');
 
                 return htmlParts.join('\n');
             };
             
-            const p = (key, label, type='text', options=[]) => ({
-                label, 
-                helpKey: key, 
-                isMobile: editScope === 'mobile', 
-                hasOverride: hasMobileOverride(key),
-                value: getValue(key),
-                onChange: (v) => update(key, v),
-                options
-            });
+            const p = (key, label, type='text', options=[]) => {
+                const hasOverride = hasMobileOverride(key);
+                return {
+                    label, 
+                    helpKey: key, 
+                    isMobile: editScope === 'mobile', 
+                    hasOverride: hasOverride,
+                    value: getValue(key),
+                    onChange: (v) => update(key, v),
+                    options,
+                    onResetOverride: hasOverride && editScope === 'mobile' ? () => removeMobileOverride(key) : null
+                };
+            };
+            
+            // Helper to check if a button maps to a localization string
+            const isLocalizedButton = (btnKey) => {
+                const map = {
+                    'btnSearch': 'search',
+                    'btnPrint': 'print',
+                    'btnDownloadPdf': 'download',
+                    'btnDownloadPages': 'download', // usually generic download
+                    'btnBookmark': 'bookmarks',
+                    'btnToc': 'tableOfContent',
+                    'btnThumbs': 'thumbnails',
+                    'btnShare': 'share',
+                    'btnNotes': 'notes'
+                };
+                return map[btnKey] !== undefined;
+            };
 
             return (
                 <div className="flex flex-col h-screen">
+                    <GlobalTooltip />
                     <header className="bg-white shadow-sm border-b border-slate-200 flex-none z-10">
                         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="bg-blue-600 p-2 rounded-lg text-white">
-                                    <Icon name="FileText" />
+                                    F
                                 </div>
-                                <h1 className="text-xl font-bold tracking-tight">Real3D FlipBook <span className="text-blue-600">Generator</span></h1>
+                                <div>
+                                    <h1 className="text-xl font-bold tracking-tight leading-tight">Real3D FlipBook <span className="text-blue-600">Generator</span></h1>
+                                    <p className="text-[10px] font-mono text-slate-500">RFG V4.18 RFGG V9.1 Date 2026-02-17</p>
+                                    <p className="text-[10px] font-mono text-slate-400">&copy; 2026 <a href="https://www.kalman.co.il" target="_blank" className="hover:text-blue-600 transition-colors">KSEC - Erez Kalman</a>. All Rights Reserved.</p>
+                                </div>
                             </div>
                             
                             <div className="flex items-center gap-4">
                                 <div className="bg-slate-100 p-1 rounded-lg flex gap-1">
                                     <button onClick={() => setEditScope('global')} className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${editScope==='global' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
-                                        <Icon name="Monitor" size={14} /> Desktop (Global)
+                                        Desktop (Global)
                                     </button>
                                     <button onClick={() => setEditScope('mobile')} className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold rounded-md transition-all ${editScope==='mobile' ? 'bg-purple-600 shadow text-white' : 'text-slate-500 hover:text-slate-700'}`}>
-                                        <Icon name="Smartphone" size={14} /> Mobile Override
+                                        Mobile Override
                                     </button>
                                 </div>
 
@@ -881,7 +1657,6 @@
                             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
                                 {editScope === 'mobile' && (
                                     <div className="bg-purple-50 border border-purple-200 p-3 rounded-md mb-6 flex items-start gap-3">
-                                        <Icon name="Smartphone" className="text-purple-600 mt-1" size={20} />
                                         <div>
                                             <h4 className="text-sm font-bold text-purple-700">Editing Mobile Overrides</h4>
                                             <p className="text-xs text-purple-600 mt-1">Changes made here will only apply to mobile devices. If a field says "Inherited", it uses the Desktop value.</p>
@@ -891,29 +1666,37 @@
 
                                 {activeTab === 'source' && (
                                     <Section title="Content Source" icon="Database">
+                                        <div className="mb-4">
+                                            <Toggle label="Include FontAwesome (CDN)" checked={includeFontAwesome} onChange={setIncludeFontAwesome} helpKey="includeFontAwesome" isMobile={false} />
+                                            <Toggle label="Include Material Icons (CDN)" checked={includeMaterialIcons} onChange={setIncludeMaterialIcons} helpKey="includeMaterialIcons" isMobile={false} />
+                                        </div>
                                         <TextInput {...p('pdfUrl', 'PDF URL', 'text')} placeholder="books/book.pdf" />
-                                        <TextInput {...p('licenseKey', 'License Key')} placeholder="Paste key..." />
                                         <TextInput {...p('name', 'Project Name')} />
                                         
                                         <Toggle label="Auto-detect PDF Links" checked={getValue('pdfAutoLinks')} onChange={(v) => update('pdfAutoLinks', v)} helpKey="pdfAutoLinks" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('pdfAutoLinks')} />
                                         
                                         {editScope === 'global' && (
                                             <>
-                                                <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                                <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200 relative overflow-hidden">
                                                     <div className="flex items-center justify-between mb-2">
                                                         <h4 className="text-sm font-bold text-slate-700">Pages ({config.pages.length})</h4>
-                                                        <button onClick={() => setShowPageManager(true)} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1">
-                                                            <Icon name="Edit2" size={12} /> Manage Pages
-                                                        </button>
+                                                        <div className="flex gap-2">
+                                                            <button onClick={() => setShowPdfConverter(true)} className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 transition-colors flex items-center gap-1 shadow-sm">
+                                                                <Icon name="Images" size={14} /> PDF to Images
+                                                            </button>
+                                                            <button onClick={() => setShowPageManager(true)} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1">
+                                                                Manage Pages
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <p className="text-xs text-slate-500">Add pages, HTML content, videos, and links.</p>
+                                                    <p className="text-xs text-slate-500">Add pages, HTML content, videos, and links. Use "PDF to Images" for optimized loading.</p>
                                                 </div>
 
                                                 <div className="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
                                                     <div className="flex items-center justify-between mb-2">
                                                         <h4 className="text-sm font-bold text-slate-700">Table of Contents ({config.tableOfContent.length})</h4>
                                                         <button onClick={() => setShowTocManager(true)} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1">
-                                                            <Icon name="List" size={12} /> Manage TOC
+                                                            Manage TOC
                                                         </button>
                                                     </div>
                                                 </div>
@@ -921,6 +1704,12 @@
                                         )}
                                         
                                         <JsonInput label="Assets (Sounds/Images)" value={getValue('assets')} onChange={(v) => update('assets', v)} helpKey="assets" isMobile={editScope==='mobile'} />
+                                        <div className="flex items-center justify-between">
+                                            <Toggle label="PDF Text Layer" checked={getValue('pdfTextLayer')} onChange={(v) => update('pdfTextLayer', v)} helpKey="pdfTextLayer" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('pdfTextLayer')} />
+                                            {!getValue('pdfTextLayer') && (
+                                                <span className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded">⚠️ Required for Search</span>
+                                            )}
+                                        </div>
                                         
                                         <div className="mt-4 border-t pt-4">
                                             <h4 className="text-xs font-bold uppercase text-slate-500 mb-2">Loading Strategy</h4>
@@ -933,6 +1722,7 @@
                                     </Section>
                                 )}
 
+                                {/* ... (other tabs remain the same) ... */}
                                 {activeTab === 'layout' && (
                                     <div className="space-y-4">
                                         <Section title="View Settings" icon="Eye">
@@ -941,20 +1731,43 @@
                                             <SelectInput {...p('layout', 'UI Layout', 'text', [{value:'1',label:'Layout 1'},{value:'2',label:'Layout 2'},{value:'3',label:'Layout 3'},{value:'4',label:'Layout 4'}])} />
                                             
                                             <Toggle label="Right to Left" checked={getValue('rightToLeft')} onChange={(v) => update('rightToLeft', v)} helpKey="rightToLeft" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('rightToLeft')} />
-                                            <Toggle label="Responsive View" checked={getValue('responsiveView')} onChange={(v) => update('responsiveView', v)} helpKey="responsiveView" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('responsiveView')} />
                                             
+                                            {editScope === 'global' && getValue('rightToLeft') && (
+                                                <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded-md flex items-center justify-between">
+                                                    <span className="text-xs text-blue-800">Use Hebrew defaults?</span>
+                                                    <button 
+                                                        onClick={applyHebrewPreset}
+                                                        className="px-2 py-1 bg-blue-600 text-white rounded text-[10px] font-bold shadow hover:bg-blue-700 transition-colors"
+                                                    >
+                                                        Quick Hebrew Setup
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            <Toggle label="Responsive View" checked={getValue('responsiveView')} onChange={(v) => update('responsiveView', v)} helpKey="responsiveView" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('responsiveView')} />
+                                            <Toggle label="Responsive Height" checked={getValue('responsiveHeight')} onChange={(v) => update('responsiveHeight', v)} helpKey="responsiveHeight" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('responsiveHeight')} />
+                                            <TextInput {...p('containerRatio', 'Container Ratio (e.g. 16/9)')} helpKey="containerRatio" />
+
                                             <TextInput {...p('backgroundColor', 'Background Color')} />
                                             <TextInput {...p('backgroundImage', 'Background Image URL')} />
                                             <TextInput {...p('backgroundPattern', 'Background Pattern URL')} />
                                             <Toggle label="Transparent Background" checked={getValue('backgroundTransparent')} onChange={(v) => update('backgroundTransparent', v)} helpKey="backgroundTransparent" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('backgroundTransparent')} />
                                             <TextInput {...p('skinColor', 'Skin Color (Primary)')} helpKey="skinColor" />
                                             <TextInput {...p('skinBackground', 'Skin Background (Secondary)')} helpKey="skinBackground" />
+                                            <TextInput {...p('googleFontsUrl', 'Google Fonts URL')} />
+                                            <TextInput {...p('googleAnalyticsTrackingCode', 'GA Tracking ID')} />
                                         </Section>
                                         <Section title="Branding" icon="Zap">
                                             <TextInput {...p('logoImg', 'Logo Image URL')} />
                                             <TextInput {...p('logoUrl', 'Logo Click URL')} />
                                             <TextInput {...p('logoCSS', 'Logo CSS Position')} />
                                             <TextInput {...p('preloaderText', 'Preloader Text')} />
+                                        </Section>
+                                        <Section title="Cover" icon="Layers">
+                                            <Toggle label="Scale Cover" checked={getValue('scaleCover')} onChange={(v) => update('scaleCover', v)} helpKey="scaleCover" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('scaleCover')} />
+                                            <Toggle label="Show Cover" checked={getValue('cover')} onChange={(v) => update('cover', v)} helpKey="cover" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('cover')} />
+                                            <Toggle label="Show Back Cover" checked={getValue('backCover')} onChange={(v) => update('backCover', v)} helpKey="backCover" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('backCover')} />
+                                            <Toggle label="Page Captions" checked={getValue('pageCaptions')} onChange={(v) => update('pageCaptions', v)} helpKey="pageCaptions" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('pageCaptions')} />
                                         </Section>
                                     </div>
                                 )}
@@ -995,7 +1808,9 @@
                                         <Section title="Buttons Styling" icon="Palette">
                                             <div className="grid grid-cols-2 gap-4">
                                                 <TextInput {...p('btnColor', 'Icon Color')} />
+                                                <TextInput {...p('btnColorHover', 'Hover Icon Color')} helpKey="btnColorHover" />
                                                 <TextInput {...p('btnBackground', 'Background')} />
+                                                <TextInput {...p('btnBackgroundHover', 'Hover Background')} helpKey="btnBackgroundHover" />
                                                 <NumberInput {...p('btnSize', 'Icon Size')} />
                                                 <NumberInput {...p('btnRadius', 'Radius')} />
                                                 <NumberInput {...p('btnMargin', 'Margin')} />
@@ -1005,9 +1820,27 @@
                                         <Section title="Side Navigation Arrows" icon="MousePointer">
                                             <div className="grid grid-cols-2 gap-4">
                                                 <TextInput {...p('sideBtnColor', 'Color')} />
+                                                <TextInput {...p('sideBtnColorHover', 'Hover Color')} helpKey="sideBtnColorHover" />
                                                 <TextInput {...p('sideBtnBackground', 'Background')} />
+                                                <TextInput {...p('sideBtnBackgroundHover', 'Hover Background')} helpKey="sideBtnBackgroundHover" />
                                                 <NumberInput {...p('sideBtnSize', 'Size')} />
                                                 <NumberInput {...p('sideBtnPaddingV', 'Padding V')} />
+                                            </div>
+                                        </Section>
+                                        
+                                        <Section title="Floating Menu Styling" icon="Layers">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <TextInput {...p('floatingBtnColor', 'Color')} helpKey="floatingBtnColor" />
+                                                <TextInput {...p('floatingBtnColorHover', 'Hover Color')} helpKey="floatingBtnColorHover" />
+                                                <TextInput {...p('floatingBtnBackground', 'Background')} helpKey="floatingBtnBackground" />
+                                                <TextInput {...p('floatingBtnBackgroundHover', 'Hover Background')} helpKey="floatingBtnBackgroundHover" />
+                                            </div>
+                                        </Section>
+                                        
+                                        <Section title="Simple UI Configs" icon="Settings">
+                                             <div className="grid grid-cols-2 gap-4">
+                                                <TextInput {...p('menuFontSize', 'Menu Font Size')} placeholder="e.g. 14px" />
+                                                <TextInput {...p('menuFontColor', 'Menu Font Color')} placeholder="e.g. #333" />
                                             </div>
                                         </Section>
                                     </div>
@@ -1017,31 +1850,71 @@
                                      <div className="space-y-6">
                                         <Section title="Button Visibility" icon="CheckSquare">
                                             <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                                                {Object.keys(config).filter(k => k.startsWith('btn') && typeof config[k] === 'object' && config[k].hasOwnProperty('enabled')).map(key => {
+                                                {Object.keys(config).filter(k => (k.startsWith('btn') || k === 'currentPage') && typeof config[k] === 'object' && config[k].hasOwnProperty('enabled')).map(key => {
                                                     const currentVal = editScope === 'mobile' 
                                                         ? (config.mobile && config.mobile[key] ? config.mobile[key].enabled : config[key].enabled)
                                                         : config[key].enabled;
                                                     const hasOver = editScope === 'mobile' && config.mobile && config.mobile[key] && config.mobile[key].enabled !== undefined;
+                                                    const showWarning = key === 'btnSearch' && currentVal === true && !getValue('pdfTextLayer');
+                                                    
                                                     return (
-                                                        <Toggle 
-                                                            key={key} 
-                                                            label={key.replace('btn', '')} 
-                                                            checked={currentVal} 
-                                                            onChange={() => toggleButton(key)} 
-                                                            helpKey={key} 
-                                                            isMobile={editScope==='mobile'}
-                                                            hasOverride={hasOver}
-                                                        />
+                                                        <div key={key} className="relative">
+                                                            <Toggle 
+                                                                label={key.replace('btn', '')} 
+                                                                checked={currentVal} 
+                                                                onChange={() => toggleButton(key)} 
+                                                                helpKey={key} 
+                                                                isMobile={editScope==='mobile'}
+                                                                hasOverride={hasOver}
+                                                            />
+                                                            {showWarning && (
+                                                                <span className="absolute right-12 top-2 text-[10px] text-red-500 bg-red-50 px-1 rounded">Needs Text Layer</span>
+                                                            )}
+                                                        </div>
                                                     );
                                                 })}
                                             </div>
                                         </Section>
                                         
                                         <Section title="Button Order" icon="List">
-                                            <JsonInput label="Toolbar Button Order (Array)" value={getValue('btnOrder')} onChange={(v) => update('btnOrder', v)} helpKey="btnOrder" isMobile={editScope==='mobile'} />
+                                             <div className="bg-white border border-slate-200 rounded-lg overflow-hidden mb-2">
+                                                {getValue('btnOrder').map((btn, idx) => (
+                                                    <div key={btn} className="flex items-center justify-between p-2 border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                                                        <span className="text-xs font-mono">{btn}</span>
+                                                        <div className="flex gap-1">
+                                                            <button 
+                                                                onClick={() => moveBtnOrder(idx, 'up')}
+                                                                disabled={idx === 0}
+                                                                className="p-1 hover:bg-slate-200 rounded disabled:opacity-30"
+                                                            >
+                                                                <Icon name="ArrowUp" size={12}/>
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => moveBtnOrder(idx, 'down')}
+                                                                disabled={idx === getValue('btnOrder').length - 1}
+                                                                className="p-1 hover:bg-slate-200 rounded disabled:opacity-30"
+                                                            >
+                                                                <Icon name="ArrowDown" size={12}/>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                             </div>
+                                             <div className="flex justify-between items-center">
+                                                 <p className="text-[10px] text-slate-400">Use arrows to reorder toolbar items.</p>
+                                                 <button onClick={() => setShowOrderManual(!showOrderManual)} className="text-[10px] text-blue-500 underline">
+                                                    {showOrderManual ? "Hide Manual JSON" : "Manual JSON Edit"}
+                                                 </button>
+                                             </div>
+                                             {showOrderManual && (
+                                                 <JsonInput label="Toolbar Button Order (Array)" value={getValue('btnOrder')} onChange={(v) => update('btnOrder', v)} helpKey="btnOrder" isMobile={editScope==='mobile'} />
+                                             )}
                                         </Section>
 
                                         <Section title="Individual Button Customizer" icon="Sliders">
+                                            <div className="mb-4 text-xs text-blue-700 bg-blue-50 p-3 border border-blue-200 rounded">
+                                                <p><strong>Move Buttons:</strong> To move a button between the Top and Bottom toolbars, change the "Bar Position" below.</p>
+                                            </div>
                                             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                                                 <SelectInput 
                                                     label="Select Button to Edit" 
@@ -1053,11 +1926,33 @@
                                                     hasOverride={false}
                                                 />
                                                 <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-200 pt-4">
-                                                    <TextInput label="Title (Hover)" value={getValue(selectedBtn).title} onChange={(v) => updateButtonProp(selectedBtn, 'title', v)} isMobile={editScope==='mobile'} />
-                                                    <TextInput label="Icon (FontAwesome)" value={getValue(selectedBtn).iconFA} onChange={(v) => updateButtonProp(selectedBtn, 'iconFA', v)} isMobile={editScope==='mobile'} />
-                                                    <TextInput label="Icon (Material)" value={getValue(selectedBtn).iconM} onChange={(v) => updateButtonProp(selectedBtn, 'iconM', v)} isMobile={editScope==='mobile'} />
-                                                    <SelectInput label="H-Align" value={getValue(selectedBtn).hAlign} onChange={(v) => updateButtonProp(selectedBtn, 'hAlign', v)} options={[{value:'left',label:'Left'},{value:'right',label:'Right'},{value:'center',label:'Center'}]} isMobile={editScope==='mobile'} />
-                                                    <SelectInput label="V-Align" value={getValue(selectedBtn).vAlign} onChange={(v) => updateButtonProp(selectedBtn, 'vAlign', v)} options={[{value:'top',label:'Top'},{value:'bottom',label:'Bottom'}]} isMobile={editScope==='mobile'} />
+                                                    { !isLocalizedButton(selectedBtn) && (
+                                                        <TextInput label="Title (Hover)" value={getValue(selectedBtn).title} onChange={(v) => updateButtonProp(selectedBtn, 'title', v)} isMobile={editScope==='mobile'} />
+                                                    )}
+                                                    <SelectInput label="Bar Position (vAlign)" value={getValue(selectedBtn).vAlign} onChange={(v) => updateButtonProp(selectedBtn, 'vAlign', v)} options={[{value:'top',label:'Top Bar'},{value:'bottom',label:'Bottom Bar'}]} isMobile={editScope==='mobile'} />
+                                                    <SelectInput label="Horizontal Align" value={getValue(selectedBtn).hAlign} onChange={(v) => updateButtonProp(selectedBtn, 'hAlign', v)} options={[{value:'left',label:'Left'},{value:'right',label:'Right'},{value:'center',label:'Center'}]} isMobile={editScope==='mobile'} />
+                                                    
+                                                    <div className="col-span-2 relative">
+                                                        <TextInput 
+                                                            label="FontAwesome Class (e.g. fab fa-facebook-f)" 
+                                                            value={getValue(selectedBtn).iconFA} 
+                                                            onChange={(v) => updateButtonProp(selectedBtn, 'iconFA', v)} 
+                                                            isMobile={editScope==='mobile'} 
+                                                            placeholder={`Default: ${defaultOptions[selectedBtn]?.iconFA || 'None'}`}
+                                                        />
+                                                         <a href="https://fontawesome.com/search?m=free" target="_blank" className="absolute top-0 right-0 text-[10px] text-blue-500 hover:underline flex items-center gap-1">Search Icons <Icon name="ExternalLink" size={10}/></a>
+                                                    </div>
+
+                                                    <div className="col-span-2 relative">
+                                                        <TextInput 
+                                                            label="Material Icon" 
+                                                            value={getValue(selectedBtn).iconM} 
+                                                            onChange={(v) => updateButtonProp(selectedBtn, 'iconM', v)} 
+                                                            isMobile={editScope==='mobile'} 
+                                                            helpKey="iconM"
+                                                        />
+                                                        <a href="https://fonts.google.com/icons" target="_blank" className="absolute top-0 right-0 text-[10px] text-blue-500 hover:underline flex items-center gap-1">Search Material Icons <Icon name="ExternalLink" size={10}/></a>
+                                                    </div>
                                                     
                                                     {selectedBtn === 'btnDownloadPages' && (
                                                         <div className="col-span-2 mt-2 border-t pt-2">
@@ -1074,13 +1969,63 @@
                                             </div>
                                         </Section>
                                         <Section title="Social Sharing" icon="Share2">
-                                            <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                                                {['whatsapp','twitter','facebook','pinterest','email','linkedin','digg','reddit'].map(key => {
+                                            <div className="grid grid-cols-1 gap-2">
+                                                {['whatsapp','twitter','facebook','pinterest','email','linkedin','digg','reddit', 'link'].map(key => {
                                                      const currentVal = editScope === 'mobile' 
                                                         ? (config.mobile && config.mobile[key] ? config.mobile[key].enabled : config[key].enabled)
                                                         : config[key].enabled;
-                                                    const hasOver = editScope === 'mobile' && config.mobile && config.mobile[key] && config.mobile[key].enabled !== undefined;
-                                                    return <Toggle key={key} label={key.charAt(0).toUpperCase() + key.slice(1)} checked={currentVal} onChange={() => toggleSocial(key)} isMobile={editScope==='mobile'} hasOverride={hasOver} />
+                                                     const hasOver = editScope === 'mobile' && config.mobile && config.mobile[key] && config.mobile[key].enabled !== undefined;
+                                                     const currentIcon = editScope === 'mobile'
+                                                        ? (config.mobile && config.mobile[key] ? config.mobile[key].icon : config[key].icon)
+                                                        : config[key].icon;
+                                                    const currentTitle = editScope === 'mobile'
+                                                        ? (config.mobile && config.mobile[key] ? config.mobile[key].title : config[key].title)
+                                                        : config[key].title;
+                                                    
+                                                    return (
+                                                        <div key={key} className="flex flex-col gap-2 border p-2 rounded bg-white">
+                                                            <div className="flex items-center justify-between">
+                                                                <Toggle 
+                                                                    key={key} 
+                                                                    label={key.charAt(0).toUpperCase() + key.slice(1)} 
+                                                                    checked={currentVal} 
+                                                                    onChange={() => toggleSocial(key)} 
+                                                                    isMobile={editScope==='mobile'} 
+                                                                    hasOverride={hasOver} 
+                                                                />
+                                                                {socialEditing === key ? (
+                                                                     <button onClick={() => setSocialEditing(null)} className="text-xs text-gray-500">Done</button>
+                                                                ) : (
+                                                                    <button onClick={() => setSocialEditing(key)} className="text-xs text-blue-600 underline">Customize</button>
+                                                                )}
+                                                            </div>
+                                                            {socialEditing === key && (
+                                                                <div className="flex flex-col gap-2 pt-2 border-t mt-1">
+                                                                        <div className="relative w-full">
+                                                                             <label className="text-[10px] text-slate-500 font-bold block mb-1">FontAwesome Class (e.g. fab fa-facebook-f)</label>
+                                                                             <input 
+                                                                                type="text" 
+                                                                                className="w-full text-xs p-1 border rounded" 
+                                                                                value={currentIcon || ''}
+                                                                                onChange={(e) => updateSocialProp(key, 'icon', e.target.value)}
+                                                                                placeholder="e.g. fab fa-facebook-f"
+                                                                            />
+                                                                            <a href="https://fontawesome.com/search?m=free" target="_blank" className="absolute top-0 right-0 text-[8px] text-blue-500 hover:underline flex items-center gap-1">Search Icons <Icon name="ExternalLink" size={8}/></a>
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="text-[10px] text-slate-500 font-bold block mb-1">Tooltip Title</label>
+                                                                            <input 
+                                                                                type="text" 
+                                                                                className="w-full text-xs p-1 border rounded" 
+                                                                                value={currentTitle || ''}
+                                                                                onChange={(e) => updateSocialProp(key, 'title', e.target.value)}
+                                                                                placeholder="Hover Text"
+                                                                            />
+                                                                        </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
                                                 })}
                                             </div>
                                         </Section>
@@ -1092,7 +2037,10 @@
                                         <Section title="Interaction" icon="MousePointer">
                                             <Toggle label="Touch Swipe" checked={getValue('touchSwipeEnabled')} onChange={(v) => update('touchSwipeEnabled', v)} helpKey="touchSwipeEnabled" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('touchSwipeEnabled')} />
                                             <Toggle label="Right Click" checked={getValue('rightClickEnabled')} onChange={(v) => update('rightClickEnabled', v)} helpKey="rightClickEnabled" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('rightClickEnabled')} />
-                                            <Toggle label="Deep Linking" checked={getValue('deeplinkingEnabled')} onChange={(v) => update('deeplinkingEnabled', v)} helpKey="deeplinkingEnabled" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('deeplinkingEnabled')} />
+                                            <div className="grid grid-cols-2 gap-4 items-center border-t border-slate-100 pt-3 mt-1">
+                                                <Toggle label="Deep Linking" checked={getValue('deeplinkingEnabled')} onChange={(v) => update('deeplinkingEnabled', v)} helpKey="deeplinkingEnabled" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('deeplinkingEnabled')} />
+                                                <TextInput {...p('deeplinkingPrefix', 'Prefix')} placeholder="e.g. book1_" helpKey="deeplinkingPrefix" />
+                                            </div>
                                             <Toggle label="Page Drag Disabled" checked={getValue('pageDragDisabled')} onChange={(v) => update('pageDragDisabled', v)} helpKey="pageDragDisabled" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('pageDragDisabled')} />
                                             <TextInput {...p('pageClickAreaWdith', 'Click Area Width')} />
                                             <Toggle label="Disable Wheel (Unless Fullscreen)" checked={getValue('wheelDisabledNotFullscreen')} onChange={(v) => update('wheelDisabledNotFullscreen', v)} helpKey="wheelDisabledNotFullscreen" />
@@ -1107,9 +2055,9 @@
                                         </Section>
                                         <Section title="Zoom & Pan" icon="ImageIcon">
                                             <div className="grid grid-cols-2 gap-4">
-                                                <NumberInput {...p('zoomStep', 'Zoom Step')} />
-                                                <NumberInput {...p('zoomTime', 'Zoom Time')} />
-                                                <NumberInput {...p('zoomMax2', 'Max Zoom (Level 2)')} />
+                                                <NumberInput {...p('zoomStep', 'Zoom Step')} helpKey="zoomStep" />
+                                                <NumberInput {...p('zoomTime', 'Zoom Time')} helpKey="zoomTime" />
+                                                <NumberInput {...p('zoomMax2', 'Max Zoom (Level 2)')} helpKey="zoomMax2" />
                                                 <Toggle label="Reset Zoom on Page" checked={getValue('zoomReset')} onChange={(v) => update('zoomReset', v)} helpKey="zoomReset" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('zoomReset')} />
                                             </div>
                                         </Section>
@@ -1117,7 +2065,16 @@
                                             <div className="grid grid-cols-2 gap-4">
                                                 <Toggle label="Flip Sound" checked={getValue('flipSound')} onChange={(v) => update('flipSound', v)} helpKey="flipSound" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('flipSound')} />
                                                 <Toggle label="Autoplay" checked={getValue('autoplayOnStart')} onChange={(v) => update('autoplayOnStart', v)} helpKey="autoplayOnStart" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('autoplayOnStart')} />
+                                                <NumberInput {...p('autoplayStartPage', 'Autoplay Start Page')} helpKey="autoplayStartPage" />
                                             </div>
+                                            <TextInput 
+                                                label="Flip Sound File (MP3)" 
+                                                value={config.assets?.flipMp3} 
+                                                onChange={(v) => updateAsset('flipMp3', v)} 
+                                                placeholder="mp3/turnPage.mp3" 
+                                                helpKey="flipMp3" 
+                                                isMobile={false} 
+                                            />
                                             <TextInput {...p('backgroundMusic', 'Background Music URL (MP3)')} helpKey="backgroundMusic" />
                                         </Section>
                                     </div>
@@ -1127,8 +2084,8 @@
                                     <div className="space-y-4">
                                         <Section title="Camera Limits" icon="Box">
                                             <div className="grid grid-cols-2 gap-4">
-                                                <NumberInput {...p('panMax', 'Pan Max')} />
-                                                <NumberInput {...p('tiltMax', 'Tilt Max')} />
+                                                <NumberInput {...p('panMax', 'Pan Max')} helpKey="panMax" />
+                                                <NumberInput {...p('tiltMax', 'Tilt Max')} helpKey="tiltMax" />
                                             </div>
                                         </Section>
                                         <Section title="Physics & Material" icon="Layers">
@@ -1148,8 +2105,8 @@
                                             <div className="grid grid-cols-2 gap-4">
                                                 <Toggle label="Lights" checked={getValue('lights')} onChange={(v) => update('lights', v)} helpKey="lights" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('lights')} />
                                                 <Toggle label="Shadows" checked={getValue('shadows')} onChange={(v) => update('shadows', v)} helpKey="webglShadows" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('shadows')} />
-                                                <NumberInput {...p('lightIntensity', 'Light Intensity', 'number', [], 0.1)} />
-                                                <NumberInput {...p('shadowOpacity', 'Shadow Opacity', 'number', [], 0.1)} />
+                                                <NumberInput {...p('lightIntensity', 'Light Intensity', 'number', [], 0.1)} helpKey="lightIntensity" />
+                                                <NumberInput {...p('shadowOpacity', 'Shadow Opacity', 'number', [], 0.1)} helpKey="shadowOpacity" />
                                             </div>
                                         </Section>
                                     </div>
@@ -1160,7 +2117,7 @@
                                         <Section title="Lightbox" icon="Layers">
                                             <Toggle label="Enable Lightbox" checked={getValue('lightBox')} onChange={(v) => update('lightBox', v)} helpKey="lightBox" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('lightBox')} />
                                             <Toggle label="Close On Click" checked={getValue('lightboxCloseOnClick')} onChange={(v) => update('lightboxCloseOnClick', v)} helpKey="lightboxCloseOnClick" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('lightboxCloseOnClick')} />
-                                            <TextInput {...p('lightboxBackground', 'Background CSS')} />
+                                            <TextInput {...p('lightboxBackground', 'Background CSS')} helpKey="lightboxBackground" />
                                         </Section>
                                         <Section title="System" icon="Settings">
                                             <NumberInput {...p('rangeChunkSize', 'Chunk Size (KB)')} />
@@ -1168,15 +2125,69 @@
                                             <Toggle label="Disable Auto-Fetch" checked={getValue('disableAutoFetch')} onChange={(v) => update('disableAutoFetch', v)} helpKey="disableAutoFetch" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('disableAutoFetch')} />
                                             <Toggle label="Disable Range Requests" checked={getValue('disableRange')} onChange={(v) => update('disableRange', v)} helpKey="disableRange" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('disableRange')} />
                                             <Toggle label="Native PDF on Mobile" checked={getValue('pdfBrowserViewerIfMobile')} onChange={(v) => update('pdfBrowserViewerIfMobile', v)} helpKey="pdfBrowserViewerIfMobile" isMobile={editScope==='mobile'} hasOverride={hasMobileOverride('pdfBrowserViewerIfMobile')} />
-                                            <Toggle label="Use Native PDF in IE" checked={getValue('pdfBrowserViewerIfIE')} onChange={(v) => update('pdfBrowserViewerIfIE', v)} />
-                                            <TextInput {...p('pdfBrowserViewerFullscreenTarget', 'Native Viewer Target')} />
+                                            <Toggle label="Use Native PDF in IE" checked={getValue('pdfBrowserViewerIfIE')} onChange={(v) => update('pdfBrowserViewerIfIE', v)} helpKey="pdfBrowserViewerIfIE" />
+                                            <TextInput {...p('pdfBrowserViewerFullscreenTarget', 'Native Viewer Target')} helpKey="pdfBrowserViewerFullscreenTarget" />
                                             <TextInput {...p('googleAnalyticsTrackingCode', 'GA Tracking ID')} />
                                             <NumberInput {...p('minPixelRatio', 'Min Pixel Ratio')} />
                                             <NumberInput {...p('minimumAndroidVersion', 'Min Android Version')} />
+                                            
+                                            <div className="mt-4">
+                                                <label className="block text-xs font-bold uppercase tracking-wide flex items-center text-slate-500 mb-1">
+                                                    Custom CSS Override
+                                                    <div className="ml-1 cursor-help" onMouseEnter={(e) => tooltipEvents.show(tooltips.customCSS, e.clientX, e.clientY)} onMouseLeave={() => tooltipEvents.hide()}>
+                                                        <InfoIcon />
+                                                    </div>
+                                                </label>
+                                                <div className="flex gap-2">
+                                                    <textarea 
+                                                        className="w-2/3 rounded-md border text-xs p-2 h-32 font-mono border-slate-300"
+                                                        value={config.customCSS} 
+                                                        onChange={(e) => update('customCSS', e.target.value)} 
+                                                        placeholder=".flipbook-main-wrapper { ... }"
+                                                    />
+                                                    <div className="w-1/3 bg-slate-100 p-2 rounded text-[10px] text-slate-600 font-mono overflow-y-auto h-32">
+                                                        <strong className="block mb-1 text-slate-800">CSS Selectors:</strong>
+                                                        <span className="block mb-1 text-blue-600 font-bold">Main</span>
+                                                        .flipbook-main-wrapper<br/>
+                                                        .flipbook-container<br/>
+                                                        .flipbook-bookLayer<br/>
+                                                        
+                                                        <span className="block mt-2 mb-1 text-blue-600 font-bold">Menus</span>
+                                                        .flipbook-menu<br/>
+                                                        .flipbook-menu-btn<br/>
+                                                        .flipbook-menu-btn:hover<br/>
+                                                        .flipbook-menu-btn.active<br/>
+                                                        
+                                                        <span className="block mt-2 mb-1 text-blue-600 font-bold">Pages</span>
+                                                        .flipbook-page<br/>
+                                                        .flipbook-page-html-content<br/>
+                                                        .flipbook-page-3d<br/>
+                                                        .flipbook-page-swipe<br/>
+                                                        
+                                                        <span className="block mt-2 mb-1 text-blue-600 font-bold">Thumbs</span>
+                                                        .flipbook-thumb<br/>
+                                                        .flipbook-thumb-image<br/>
+                                                        .flipbook-thumb-num<br/>
+                                                        .flipbook-thumb-selected<br/>
+                                                        
+                                                        <span className="block mt-2 mb-1 text-blue-600 font-bold">Lightbox</span>
+                                                        .flipbook-lightbox-wrapper<br/>
+                                                        .flipbook-lightbox-close<br/>
+                                                        
+                                                        <span className="block mt-2 mb-1 text-blue-600 font-bold">TOC</span>
+                                                        .flipbook-toc<br/>
+                                                        .flipbook-toc-item<br/>
+                                                        .flipbook-toc-item a
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </Section>
                                         <Section title="Link Settings" icon="Link">
                                             <TextInput {...p('linkColor', 'Link Color')} />
                                             <TextInput {...p('linkColorHover', 'Link Hover Color')} />
+                                            <TextInput {...p('shareUrl', 'Custom Share URL')} />
+                                            <TextInput {...p('shareTitle', 'Custom Share Title')} />
+                                            <TextInput {...p('shareImage', 'Custom Share Image URL')} />
                                         </Section>
                                         <Section title="Annotations" icon="Edit2">
                                             <JsonInput label="Note Types (JSON)" value={getValue('noteTypes')} onChange={(v) => update('noteTypes', v)} helpKey="noteTypes" isMobile={editScope==='mobile'} />
@@ -1192,6 +2203,27 @@
                                 
                                 {activeTab === 'i18n' && (
                                     <Section title="Localization Strings" icon="Globe">
+                                        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                                            <div>
+                                                <h4 className="font-bold text-blue-700 mb-1">Actions</h4>
+                                                <p className="text-[10px] text-blue-600">Quickly apply language defaults.</p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button 
+                                                    onClick={applyHebrewPreset}
+                                                    className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-bold shadow hover:bg-blue-700 transition-colors"
+                                                >
+                                                    Hebrew Preset
+                                                </button>
+                                                <button 
+                                                    onClick={resetLocalization}
+                                                    className="px-3 py-1.5 bg-white border border-slate-300 text-slate-700 rounded text-xs font-bold hover:bg-slate-50 transition-colors"
+                                                >
+                                                    Reset to English
+                                                </button>
+                                            </div>
+                                        </div>
+                                    
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {Object.keys(config.strings).map(key => (
                                                 <div key={key}>
@@ -1227,6 +2259,13 @@
 
                     </main>
 
+                    {/* PDF CONVERTER MODAL */}
+                    <PdfConverterModal 
+                        isOpen={showPdfConverter} 
+                        onClose={() => setShowPdfConverter(false)} 
+                        onAddPages={handleAddConvertedPages} 
+                    />
+
                     {/* PAGE MANAGER MODAL */}
                     <Modal isOpen={showPageManager} onClose={() => {setShowPageManager(false); setEditingPage(null);}} title="Page Manager">
                         {!editingPage && editingPage !== 0 ? (
@@ -1240,8 +2279,9 @@
                                     {config.pages.map((page, idx) => (
                                         <div key={idx} className="border border-slate-200 rounded-lg p-3 bg-slate-50 relative group">
                                             <div className="h-32 bg-slate-200 rounded mb-2 flex items-center justify-center text-slate-400 overflow-hidden">
-                                                {page.thumb || page.src ? (
-                                                    <img src={page.thumb || page.src} alt="" className="w-full h-full object-cover" />
+                                                {/* MODIFIED: Check for _previewThumb or _previewSrc for immediate display */}
+                                                {(page._previewThumb || page.thumb || page._previewSrc || page.src) ? (
+                                                    <img src={page._previewThumb || page.thumb || page._previewSrc || page.src} alt="" className="w-full h-full object-cover" />
                                                 ) : <Icon name="ImageIcon" size={32} />}
                                             </div>
                                             <h4 className="font-bold text-sm truncate">{page.title || `Page ${idx+1}`}</h4>
@@ -1263,7 +2303,23 @@
                                     <TextInput label="Image Source" value={pageEditData.src} onChange={(v) => updatePageData('src', v)} placeholder="books/page1.jpg" />
                                     <TextInput label="Thumbnail" value={pageEditData.thumb} onChange={(v) => updatePageData('thumb', v)} placeholder="books/thumb1.jpg" />
                                     <TextInput label="Page Title" value={pageEditData.title} onChange={(v) => updatePageData('title', v)} placeholder="Chapter 1" />
-                                    <TextInput label="JSON Data File (Optimized PDF)" value={pageEditData.json} onChange={(v) => updatePageData('json', v)} placeholder="books/page1.json" />
+                                    
+                                    {/* CONDITIONAL RENDER: Use JsonInput if data is object (Embed mode), else TextInput (Reference mode) */}
+                                    {typeof pageEditData.json === 'object' ? (
+                                        <JsonInput 
+                                            label="JSON Data (Embedded)" 
+                                            value={pageEditData.json} 
+                                            onChange={(v) => updatePageData('json', v)} 
+                                            helpKey="pdfTextLayer"
+                                        />
+                                    ) : (
+                                        <TextInput 
+                                            label="JSON Data File (Optimized PDF)" 
+                                            value={pageEditData.json} 
+                                            onChange={(v) => updatePageData('json', v)} 
+                                            placeholder="books/page1.json" 
+                                        />
+                                    )}
                                 </div>
 
                                 <Section title="HTML Content (Overlay)" icon="Code">

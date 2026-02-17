@@ -10,44 +10,47 @@
 <body>
     <div id="book-container" style="height: 100vh; width: 100%;"></div>
     <script type="text/javascript">
-    var container = document.getElementById("book-container");
-    var book = new FlipBook(container, {
-    s: "R3D-Y44E1YS8-abcdef-MLQ0D33N",
-    pdfUrl: "pdf/SecPin.pdf",
-    btnBookmark: {
-        enabled: false
-    },
-    btnShare: {
-        enabled: false
-    },
-    btnPrint: {
-        enabled: false
-    },
-    btnDownloadPages: {
-        enabled: false
-    },
-    btnDownloadPdf: {
-        enabled: false
-    },
-    whatsapp: {
-        enabled: false
-    },
-    twitter: {
-        enabled: false
-    },
-    facebook: {
-        enabled: false
-    },
-    pinterest: {
-        enabled: false
-    },
-    email: {
-        enabled: false
-    },
-    linkedin: {
-        enabled: false
-    }
-});
+    document.addEventListener("DOMContentLoaded", function () {
+        const options = {
+            s: "R3D-Y44E1YS8-abcdef-MLQ0D33N",
+            pdfUrl: "pdf/SecPin.pdf",
+            btnBookmark: {
+                enabled: false
+            },
+            btnShare: {
+                enabled: false
+            },
+            btnPrint: {
+                enabled: false
+            },
+            btnDownloadPages: {
+                enabled: false
+            },
+            btnDownloadPdf: {
+                enabled: false
+            },
+            whatsapp: {
+                enabled: false
+            },
+            twitter: {
+                enabled: false
+            },
+            facebook: {
+                enabled: false
+            },
+            pinterest: {
+                enabled: false
+            },
+            email: {
+                enabled: false
+            },
+            linkedin: {
+                enabled: false
+            }
+          };
+         const container = document.getElementById('book-container');
+         new FlipBook(container, options);
+       });
     </script>
 </body>
 </html>

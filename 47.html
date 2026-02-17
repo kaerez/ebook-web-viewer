@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <link rel="stylesheet" type="text/css" href="css/flipbook.min.css">
+    <script src="js/flipbook.min.js"></script>
+    <script type="text/javascript">
+    document.addEventListener("DOMContentLoaded", function () {
+        const options = {
+            s: "R3D-Y44E1YS8-abcdef-MLQ0D33N",
+            pdfUrl: "pdf/lawam47.pdf",
+            btnBookmark: {
+                enabled: false
+            },
+            btnShare: {
+                enabled: false
+            },
+            btnPrint: {
+                enabled: false
+            },
+            btnDownloadPages: {
+                enabled: false
+            },
+            btnDownloadPdf: {
+                enabled: false
+            },
+            whatsapp: {
+                enabled: false
+            },
+            twitter: {
+                enabled: false
+            },
+            facebook: {
+                enabled: false
+            },
+            pinterest: {
+                enabled: false
+            },
+            email: {
+                enabled: false
+            },
+            linkedin: {
+                enabled: false
+            }
+          };
+         const container = document.getElementById('book-container');
+         new FlipBook(container, options);
+       });
+    </script>
+</head>
+<body>
+    <div id="book-container"></div>
+</body>
+</html>

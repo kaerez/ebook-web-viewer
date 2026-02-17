@@ -6,7 +6,8 @@
   <script type="text/javascript">
     document.addEventListener("DOMContentLoaded", function () {
       const options = {
-        pdfUrl: 'pdf/lawam47.pdf'
+        pdfUrl: 'pdf/lawam47.pdf',
+        mode: 'lightbox','viewMode':'webgl',pageTextureSize:'2048',pageTextureSizeSmall:'2500',pageTextureSizeMobileSmall:'1024',minPixelRatio:'1',pdfTextLayer:'false',doubleClickZoom:'true',pageDrag:'true'
       };
       const container = document.getElementById('container');
       new FlipBook(container, options);

@@ -47,13 +47,21 @@
         "autoplayLoop":true,
         "autoplayStartPage":"1",
         "rightToLeft":true,
-        "btnPrint": {"enabled": true}, 
+        "btnPrint": {"enabled": true,"title":"הדפס"}, 
         "btnDownloadPages": {"enabled": false},
-        "btnDownloadPdf": {"forceDownload": false,"enabled": true},
+        "btnDownloadPdf": {"forceDownload": false,"enabled": true,"title":"הורד"},
         "btnBookmark": {"enabled": false},
         "btnNotes": {"enabled": false}, 
-        "btnShare": {"enabled": true},
-        "btnAutoplay": {"enabled": false}
+        "btnShare": {"enabled": true, "title":"שיתוף"},
+        "btnAutoplay": {"enabled": false},
+        "pinterest": {"enabled": false},
+        "currentPage": {"title":"עמוד נוכחי"},
+        "btnNext": {"title":"עמוד הבא"},
+        "btnPrev": {"title":"עמוד קודם"},
+        "btnZoomIn": {"title":"הגדל"},
+        "btnZoomOut": {"title":"הקטן"},
+        "btnSound": {"title":"שמע"},
+        "btnExpand": {"title":"מסך מלא"},
         };
       const container = document.getElementById('container');
       new FlipBook(container, flipbookOptions_global);
